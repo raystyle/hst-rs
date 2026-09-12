@@ -18,6 +18,7 @@ D31 至 D35 ohmycloud 协调批（2026-09-13 当日闭环归档 P0048，v1.0.0 �
 - [x] 归档（P0048、四原语收口、diary）
 - [x] D37 verify 状态栏层环境探测（ohmywsl 总台 I3 适配：未部署面与缺 pwsh 转 skip，断链仍 fail；162 单测加 27 集成绿）
 - [x] D38 活体验收环境容错（总台三轮到点：grok/kimi 结果容错版，hook 层 ok 才计入活体断言、不成 skip 带首条 reason；产品 verify 面不动；R004 三.6 修订）
+- [x] D39 Windows hook 注册 sh 兼容形态（ps1 桥：powershell -File 前缀加新 ps1 shim，三面统一、grok 不动、is_ours 认前缀形、存量幂等覆盖；M062 记档；对端回执 wsl 总台 37 项全绿）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 
@@ -67,6 +68,7 @@ D28 前目标（2026-09-11 四轮裁定当日闭环归档 P0045，v0.5.4 发版�
 
 | 目标 | 状态 | 说明 |
 | --- | --- | --- |
+| wsl 与 Windows config 平移键路径归一 | 排队 | 用户口径（2026-09-13 D39 来函）：wsl 是真 Linux 内核带 `/mnt/c` 邻接，配置在两端平移时项目键路径（如 codex `[projects]`、claude `projects.<abs>`）需归一处理，P0048 D39 节记档；触发面出现时立项 |
 | D36 状态栏 HUD 簇 | 排队 | 研究先行已落 S034（流行 HUD 盘点、官方 stdin JSON 契约、多行与 MCP/tools 计数缺口）；设计追问链待启（段取舍、比例口径、多行断行、四家兼容面），随后立项 |
 | M060 两笔加 ome 更名尾巴随下个功能版发 | 完成 | M060 两笔（guard 透传白名单化加 shebang 注入缝）随 v0.6.0 tag 发出；ome 改 ark hint 串（shim warn 加 agents hint 已先行为 ark，注释尾巴随批）随 v0.6.1 清讫关账 |
 | deploy_shims 用户根旧名清扫 | 排队 | pristine 合并把旧名 shim（oma-state.*）迁进 `~/.hst/hooks` 与新名并存；退役环只扫项目级。P0047 观察面，随下个小版本 |

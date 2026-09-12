@@ -38,6 +38,21 @@ fn oma_exe() -> PathBuf {
     std::env::current_exe().unwrap_or_else(|_| PathBuf::from("hst"))
 }
 
+/// token 的文件名 stem（剥路径、剥引号、剥 .exe 后缀）。
+fn token_stem(token: &str) -> &str {
+    token
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or(token)
+        .trim_matches('"')
+        .trim_end_matches(".exe")
+}
+
+/// hst 现行形态加 oma 历史形态（heal 与重部署收敛旧注册都靠旧名可识）。
+fn family_stem(stem: &str) -> bool {
+    stem == "hst" || stem.starts_with("hst-") || stem == "oma" || stem.starts_with("oma-")
+}
+
 pub(crate) fn is_ours(command: &str) -> bool {
     let lower = command.to_ascii_lowercase();
     if lower.contains(&oma_exe().display().to_string().to_ascii_lowercase()) {
@@ -48,20 +63,33 @@ pub(crate) fn is_ours(command: &str) -> bool {
     // the PowerShell call operator first (`& "exe" hook`), so strip a leading
     // `&` before taking the token — without this the Windows-side field of a
     // shared project reads as foreign (doctor misses it; redeploy appends a
-    // duplicate once the embedded exe path goes stale).
-    let first = lower
-        .trim_start_matches('&')
-        .split_whitespace()
-        .next()
-        .unwrap_or("");
-    let stem = first
-        .rsplit(['\\', '/'])
-        .next()
-        .unwrap_or("")
-        .trim_matches('"')
-        .trim_end_matches(".exe");
-    // hst 现行形态加 oma 历史形态（heal 与重部署收敛旧注册都靠旧名可识）。
-    stem == "hst" || stem.starts_with("hst-") || stem == "oma" || stem.starts_with("oma-")
+    // duplicate once the embedded exe path goes stale). D39：Windows 注册是
+    // `powershell ... -File <shim> agent` 解释器前缀形（claude 的 hook 执
+    // 行 shell 是 POSIX sh 系，直路径 .cmd 在 WSL 形不认盘符、cmd.exe /c
+    // 在 Git Bash 被 MSYS 吃掉，宿主实弹 2026-09-13）：cmd 系取 /c 后一
+    // token、powershell 系取 -File 后一 token，否则自家新形态误判外来、
+    // 重部署追加重复；只认该程序 token（不扫全串，防 `echo hst` 误报）。
+    let mut tokens = lower.trim_start_matches('&').split_whitespace();
+    let head = tokens.next().unwrap_or("");
+    if !matches!(
+        head,
+        "cmd" | "cmd.exe" | "powershell" | "powershell.exe" | "pwsh" | "pwsh.exe"
+    ) {
+        return family_stem(token_stem(head));
+    }
+    let rest: Vec<&str> = tokens.collect();
+    if head.starts_with("cmd") {
+        let start = usize::from(rest.first() == Some(&"/c"));
+        return rest
+            .get(start)
+            .map(|t| family_stem(token_stem(t)))
+            .unwrap_or(false);
+    }
+    rest.iter()
+        .position(|t| *t == "-file")
+        .and_then(|i| rest.get(i + 1))
+        .map(|t| family_stem(token_stem(t)))
+        .unwrap_or(false)
 }
 
 /// JSON arrays of handler groups under settings["hooks"][event], append-only:
@@ -338,18 +366,21 @@ fn claude_handler(oma: &Path, side: OsSide) -> Json {
 }
 
 /// D27：注册命令指向自包含状态 shim。D28 起常驻 `~/.hst/hooks/`（hst 自管
-/// 根，跨项目共享、hst 轮换无痛）。Windows 用**无引号正斜杠绝对路径**加
-/// 参数：settings.json 是双消费者（claude 本体经 `/usr/bin/bash -c`、grok
-/// 经 PowerShell，M047/M059），`&` 调用操作符在 bash 是语法错误、双引号
-/// 路径在 PS 是 ParserError，唯无引号正斜杠三吃（bash / PowerShell / cmd
-/// 实测 2026-09-10 全 exit 0 落盘）；边界：路径含空格时该形态在各 shell
-/// 都裂，部署侧 warn（doctor 提示）。POSIX 一律 sh 路径直引（引号在 sh
-/// 合法且必要）。
+/// 根，跨项目共享、hst 轮换无痛）。Windows 用 **`powershell -NoProfile
+/// -ExecutionPolicy Bypass -File` 前缀加无引号正斜杠 ps1 路径**加参数
+/// （D39，2026-09-13 宿主实弹）：settings.json 是双消费者（claude 本体 hook
+/// 执行 shell 是 POSIX sh 系、grok 经 PowerShell，M047/M059），sh 系对直路
+/// 径 `.cmd` 在 WSL 形不认盘符、`cmd.exe /c` 在 Git Bash 被 MSYS 参数转换
+/// 吃掉 `/c`、`//c` 在 PS 进交互态——唯「按名解析的解释器加参数位 Windows
+/// 路径」三态成立（powershell.exe 恒在、无前导斜杠参数不触发转换，与状态
+/// 栏 pwsh -File 同构）；M047 双消费者约束仍满足：单字符串、无 `&`、无引
+/// 号。边界：路径含空格时该形态在各 shell 都裂，部署侧 warn（doctor 提
+/// 示）。POSIX 一律 sh 路径直引（引号在 sh 合法且必要）。
 fn shim_command_ps_or_sh(agent: &str, oma: &Path, side: OsSide) -> String {
     match side {
         OsSide::Windows => format!(
-            "{} {}",
-            crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.cmd")),
+            "powershell -NoProfile -ExecutionPolicy Bypass -File {} {}",
+            crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.ps1")),
             agent
         ),
         OsSide::Unix => format!(
@@ -383,11 +414,10 @@ pub fn host_side() -> OsSide {
 /// so reruns converge byte-identically on both sides. D28：shim 在 hst 自管
 /// 根（用户级注册只写本侧家目录文件，异侧字段保留语义沿用不动）。
 fn codex_handler_value(base: &Json, oma: &Path, session_end: bool, side: OsSide) -> Json {
-    // 注册指向自包含 shim（零 oma 依赖）。Windows 侧用无引号正斜杠绝对
-    // 路径加参数（M059 统一形态：codex 的 hook 经会话环境 shell 执行
-    // ——session/mod.rs 的 environment.shell.derive_exec_args，Windows 缺省
-    // PowerShell；该形态在 bash / PS / cmd 三吃）。Unix 用 sh 路径直引。
-    // `command` 为 schema 必填（M055）：无异侧保留值时落 bare oma 兜底。
+    // 注册指向自包含 shim（零 oma 依赖）。Windows 侧用 powershell -File 前
+    // 缀加无引号正斜杠 ps1 路径（D39 sh 兼容形态，与 claude/kimi 面同款；
+    // M059 直路径形态在 PS/cmd 成立但 sh 系不认盘符路径）。Unix 用 sh 路径
+    // 直引。`command` 为 schema 必填（M055）：无异侧保留值时落 bare 兜底。
     let foreign = |key: &str| base.get(key).filter(|v| v.is_string()).cloned();
     let mut obj = serde_json::Map::new();
     obj.insert("type".into(), json!("command"));
@@ -412,8 +442,8 @@ fn codex_handler_value(base: &Json, oma: &Path, session_end: bool, side: OsSide)
         obj.insert(
             "commandWindows".into(),
             json!(format!(
-                "{} codex",
-                crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.cmd"))
+                "powershell -NoProfile -ExecutionPolicy Bypass -File {} codex",
+                crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.ps1"))
             )),
         );
     }
@@ -722,14 +752,15 @@ fn kimi_hook_entry(event: &str, command: &str) -> toml::Value {
     toml::Value::Table(m)
 }
 
-/// kimi hook 命令串：不带引号的正斜杠裸命令行（M058 实证：kimi 对整串
-/// 命令朴素消费，引号形态静默不执行；TOML basic string 反斜杠是转义符，
-/// 一律正斜杠）。
+/// kimi hook 命令串：Windows 用 powershell -File 前缀加无引号正斜杠 ps1
+/// 路径（D39 sh 兼容形态，与 claude/codex 面同款）；POSIX 是正斜杠裸命令
+/// 行（M058 实证：kimi 对整串命令朴素消费，引号形态静默不执行；TOML
+/// basic string 反斜杠是转义符，一律正斜杠）。
 fn kimi_hook_command(oma: &Path, side: OsSide) -> String {
     match side {
         OsSide::Windows => format!(
-            "{} kimi",
-            crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.cmd"))
+            "powershell -NoProfile -ExecutionPolicy Bypass -File {} kimi",
+            crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.ps1"))
         ),
         OsSide::Unix => format!("{} kimi", oma.join("hooks").join("hst-state.sh").display()),
     }
@@ -1290,6 +1321,80 @@ mod tests {
         assert!(!is_ours("echo hi"));
     }
 
+    #[test]
+    fn is_ours_recognizes_interpreter_wrapped_form_and_foreign_wraps() {
+        // D39：Windows 注册是解释器前缀形，跳过前缀（powershell 系无 /c、
+        // cmd 系带可选 /c）后取程序 token；外来解释器包裹（非 hst/oma 家
+        // 族）不得误判 ours。
+        assert!(is_ours(
+            "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/ray/.hst/hooks/hst-state.ps1 claude"
+        ));
+        assert!(is_ours("pwsh -File C:/x/.oma/hooks/hst-state.ps1 codex"));
+        assert!(is_ours(
+            "cmd.exe /c C:/Users/ray/.hst/hooks/hst-state.cmd claude"
+        ));
+        assert!(is_ours("cmd /c C:/x/.oma/hooks/hst-state.cmd codex"));
+        assert!(!is_ours("cmd.exe /c C:/tools/foreign.exe run"));
+        assert!(!is_ours("powershell -File C:/tools/foreign.ps1 run"));
+        assert!(!is_ours("cmd.exe /c echo hi"));
+    }
+
+    #[test]
+    fn windows_direct_path_form_upgrades_to_ps1_wrap() {
+        // D39 存量救济回归：M059 直路径形态（WSL 形 sh 不认盘符，宿主实弹
+        // not found）重部署后被幂等覆盖为 powershell -File 包裹单条；外来
+        // 条目保留。
+        let user = fresh_dir("wrap");
+        let oma = fresh_dir("wrap-oma");
+        let claude = user.join(".claude").join("settings.json");
+        ensure_parent(&claude).unwrap();
+        let legacy = format!(
+            r#"{{"hooks": {{"SessionStart": [{{"matcher": "*", "hooks": [
+                {{"type": "command", "command": "{}/hooks/hst-state.cmd claude"}},
+                {{"type": "command", "command": "C:\\tools\\keep.sh"}}]}}]}}}}"#,
+            crate::pathutil::forward_slash(&oma)
+        );
+        write_text(&claude, &legacy).unwrap();
+
+        let mut report = DeployReport::default();
+        deploy_user_hooks_with(&user, &oma, OsSide::Windows, &mut report).unwrap();
+        let ours = ours_in_event(&claude, "SessionStart");
+        assert_eq!(
+            ours.len(),
+            1,
+            "legacy direct form collapses to one current entry: {ours:?}"
+        );
+        assert!(
+            ours[0].starts_with("powershell -NoProfile -ExecutionPolicy Bypass -File "),
+            "wrapped form: {}",
+            ours[0]
+        );
+        assert!(
+            ours[0].ends_with("/hooks/hst-state.ps1 claude"),
+            "{}",
+            ours[0]
+        );
+        // 再跑一次幂等：包裹形态被 is_ours 认领且不陈旧，不追加重复。
+        let mut second = DeployReport::default();
+        deploy_user_hooks_with(&user, &oma, OsSide::Windows, &mut second).unwrap();
+        assert_eq!(
+            ours_in_event(&claude, "SessionStart").len(),
+            1,
+            "wrapped form is not stale on rerun"
+        );
+        let v: Json = serde_json::from_str(&fs::read_to_string(&claude).unwrap()).unwrap();
+        assert!(
+            v["hooks"]["SessionStart"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|g| g["hooks"][0]["command"].as_str() == Some("C:\\tools\\keep.sh")),
+            "foreign entry survives the upgrade"
+        );
+        let _ = fs::remove_dir_all(&user);
+        let _ = fs::remove_dir_all(&oma);
+    }
+
     /// Unique per-call suffix: same-millisecond parallel tests must not
     /// share (and mutually delete) a temp dir.
     static NEXT_TEST_DIR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -1391,8 +1496,15 @@ mod tests {
         if cfg!(windows) {
             assert!(!claude_cmd.contains('"'), "{claude_cmd}");
             assert!(!claude_cmd.starts_with('&'), "{claude_cmd}");
+            // D39：powershell -File 前缀（claude 的 hook 执行 shell 是
+            // POSIX sh 系，直路径 .cmd 在 WSL 形不认盘符）；无引号正斜杠
+            // ps1 路径与 agent 参数随尾。
             assert!(
-                claude_cmd.ends_with("/hooks/hst-state.cmd claude"),
+                claude_cmd.starts_with("powershell -NoProfile -ExecutionPolicy Bypass -File "),
+                "{claude_cmd}"
+            );
+            assert!(
+                claude_cmd.ends_with("/hooks/hst-state.ps1 claude"),
                 "{claude_cmd}"
             );
         } else {
@@ -1412,7 +1524,7 @@ mod tests {
         if cfg!(windows) {
             let cw = handler["commandWindows"].as_str().unwrap();
             assert!(!cw.contains('"') && !cw.starts_with('&'), "{cw}");
-            assert!(cw.ends_with("/hooks/hst-state.cmd codex"), "{cw}");
+            assert!(cw.ends_with("/hooks/hst-state.ps1 codex"), "{cw}");
             assert_eq!(
                 handler["command"].as_str(),
                 Some("hst hook status --agent codex"),
@@ -1565,7 +1677,7 @@ mod tests {
         );
         let cw = h["commandWindows"].as_str().unwrap();
         assert!(!cw.contains('"') && !cw.contains('&'), "{cw}");
-        assert!(cw.ends_with("/hooks/hst-state.cmd codex"), "{cw}");
+        assert!(cw.ends_with("/hooks/hst-state.ps1 codex"), "{cw}");
         assert!(!cw.contains("old2"), "owned field rewritten: {cw}");
 
         // 同形重复植入后收敛。
