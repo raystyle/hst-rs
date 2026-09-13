@@ -186,10 +186,13 @@ fn verify_statusline(agent: &str, home: &Path) -> LayerVerdict {
             "pwsh-not-on-path（状态栏可选运行时缺位：装 PowerShell 7 后重跑 hst statusline 与 verify）".into(),
         );
     }
-    // D46（codex F7）：mock 空 JSON 无 version 必走本地探，钉 HST_VER_CACHE_DIR
-    // 到 home 下的临时目录，不读不写真实 ~/.hst/cache（冷缓存每家一次
+    // D46（codex F7/F1）：mock 空 JSON 无 version 必走本地探，钉 HST_VER_CACHE_DIR
+    // 到系统临时目录的本轮专用子目录（用完即删），不读不写真实 ~/.hst/cache、
+    // 不在数据根留常驻子件（pristine 迁移判据不受扰；冷缓存每家一次
     // --version spawn 的代价口径见 R002）。
-    let ver_cache = home.join("ver-cache-probe");
+    let ver_cache =
+        std::env::temp_dir().join(format!("hst-verify-ver-cache-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&ver_cache);
     let mut child = match Command::new("pwsh")
         .arg("-NoProfile")
         .arg("-File")
@@ -216,12 +219,15 @@ fn verify_statusline(agent: &str, home: &Path) -> LayerVerdict {
     let out = match child.wait_with_output() {
         Ok(o) => o,
         Err(e) => {
+            let _ = std::fs::remove_dir_all(&ver_cache);
             return LayerVerdict::Fail {
                 reason: format!("pwsh-wait: {e}"),
                 hint: None,
-            }
+            };
         }
     };
+    // 探针隔离目录用完即删（临时目录防呆，失败不致命）。
+    let _ = std::fs::remove_dir_all(&ver_cache);
     if !out.status.success() {
         return LayerVerdict::Fail {
             reason: format!("script-exit-{}", out.status.code().unwrap_or(-1)),

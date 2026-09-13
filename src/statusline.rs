@@ -180,9 +180,14 @@ if (-not $ver -and ($agent -match '^(claude|codex|grok|kimi)$')) {
         $gi = $null
         try {
             $gi = Get-Item -LiteralPath $binPath -ErrorAction Stop
-            # 软链解析一层：升级动目标不动链本体时键仍变（F5）。
+            # 软链解析一层：升级动目标不动链本体时键仍变。LinkTarget 存的
+            # 是链接内原样串，相对路径须按链接所在目录拼（按 CWD 解析会取
+            # 到无关件或空转，npm/nvm 的 ~/.local/bin 相对软链即此形态，
+            # codex diff 轮 F2）。
             if ($gi.LinkTarget) {
-                try { $g2 = Get-Item -LiteralPath $gi.LinkTarget -ErrorAction Stop; if ($g2) { $gi = $g2 } } catch {}
+                $lt = "$($gi.LinkTarget)"
+                if (-not [IO.Path]::IsPathRooted($lt)) { $lt = Join-Path (Split-Path -Parent $gi.FullName) $lt }
+                try { $g2 = Get-Item -LiteralPath $lt -ErrorAction Stop; if ($g2) { $gi = $g2 } } catch {}
             }
         } catch { $gi = $null }
         if ($gi) {
@@ -216,19 +221,24 @@ if (-not $ver -and ($agent -match '^(claude|codex|grok|kimi)$')) {
                     $needProbe = $false
                 }
             }
-            if ($needProbe) {
-                try { $vout = (& $binPath --version 2>$null | Out-String).Trim() } catch { $vout = '' }
+            # 无缓存可写（HST_VER_CACHE_DIR 与 $HOME 双缺）就不探：否则每
+            # 帧裸 spawn，静默窗与三元组键全失效（codex diff 轮 F3），天然
+            # 回落旧形。
+            if ($needProbe -and $verFile) {
+                # stderr 回落与 agents.rs read_version 同口径（stdout 空取
+                # stderr，codex diff 轮 F4）。
+                try { $vout = (& $binPath --version 2>&1 | Out-String).Trim() } catch { $vout = '' }
                 if ($vout -match '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') { $ver = $Matches[1] } else { $ver = $null }
-                if ($verFile) {
-                    try {
-                        $vd = Split-Path -Parent $verFile
-                        if (-not (Test-Path -LiteralPath $vd)) { New-Item -ItemType Directory -Path $vd -Force | Out-Null }
-                        $tmp = "$verFile.tmp"
-                        @{ version = "$ver"; bin = $binPath; mtime = $binMtime; size = $binSize; probed_at = "$nowTicks" } |
-                            ConvertTo-Json -Compress | Set-Content -LiteralPath $tmp -NoNewline -Encoding UTF8
-                        Move-Item -LiteralPath $tmp -Destination $verFile -Force
-                    } catch {}
-                }
+                try {
+                    $vd = Split-Path -Parent $verFile
+                    if (-not (Test-Path -LiteralPath $vd)) { New-Item -ItemType Directory -Path $vd -Force | Out-Null }
+                    $tmp = "$verFile.tmp"
+                    @{ version = "$ver"; bin = $binPath; mtime = $binMtime; size = $binSize; probed_at = "$nowTicks" } |
+                        ConvertTo-Json -Compress | Set-Content -LiteralPath $tmp -NoNewline -Encoding UTF8
+                    # [IO.File]::Move 三平台覆盖语义确定（Move-Item -Force
+                    # 在 Unix 覆盖分支有历史反复，codex diff 轮 F5）。
+                    [IO.File]::Move($tmp, $verFile, $true)
+                } catch {}
             }
         }
     }
