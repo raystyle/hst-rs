@@ -1014,11 +1014,12 @@ fn verify_live_headless_acceptance_for_installed_agents() {
 
 #[test]
 fn deployed_state_shim_roundtrips_stdin_payload() {
-    // codex review G2 的最小集成钉：固定 payload（含中文）经管道喂给**落盘
-    // 的**宿主载体 shim（Windows = ps1 面、Unix = sh 面），断言 state JSON
-    // 的 event / state / session 与输入一致——唯一能钉住 stdin 读法的一层
+    // codex review G2 的最小集成钉：固定 payload 经管道喂给**落盘的**宿主
+    // 载体 shim（Windows = ps1 面、Unix = sh 面），断言 state JSON 的
+    // event / state / session 与输入一致——唯一能钉住 stdin 读法的一层
     // （G1 曾在读法回归下空解析假绿）。直管道不经中间 shell（claude 的
-    // spawner 也是直管道形态）。
+    // spawner 也是直管道形态）。session 用 ASCII（H1 对齐实测口径：非
+    // ASCII 解码随宿主控制台代码页，不作跨宿主断言）。
     let tmp = std::env::temp_dir().join(format!(
         "oma-cli-shim-rt-{}-{}",
         std::process::id(),
@@ -1038,7 +1039,7 @@ fn deployed_state_shim_roundtrips_stdin_payload() {
     assert!(dep.status.success(), "hook init failed: {:?}", dep.status);
     use std::io::Write;
     use std::process::{Command, Stdio};
-    let payload = "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"rt-中文-42\"}";
+    let payload = "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"rt-ascii-42\"}";
     let mut child = if cfg!(windows) {
         let ps1 = root
             .join("hooks")
@@ -1090,7 +1091,7 @@ fn deployed_state_shim_roundtrips_stdin_payload() {
     let event = v["event"].as_str().unwrap_or("").to_ascii_lowercase();
     assert_eq!(event, "userpromptsubmit", "{text}");
     assert_eq!(v["state"].as_str(), Some("working"), "{text}");
-    assert_eq!(v["session"].as_str(), Some("rt-中文-42"), "{text}");
+    assert_eq!(v["session"].as_str(), Some("rt-ascii-42"), "{text}");
     let _ = std::fs::remove_dir_all(&tmp);
 }
 

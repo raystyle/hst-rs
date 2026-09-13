@@ -294,8 +294,11 @@ if (-not $agent) { exit 0 }
 # 预读进管道输入集合，[Console]::OpenStandardInput 的新 StreamReader 从流
 # 末尾起读恒空；$input 是宿主已收集的行集，join 还原 payload（Out-String
 # 会补尾换行，对 JSON 解析与 guard 临时文件均无碍）。读前先把
-# InputEncoding 钉 UTF-8（$input 惰性枚举，先设后读中文不乱码；实测
-# pipe / redirect / WSL 三态全过）。
+# InputEncoding 钉 UTF-8（$input 惰性枚举，先设后读）。保真口径（H1 对齐
+# 实测）：ASCII 载荷保真（event / state / session 实跑字段全对）；非
+# ASCII 解码随宿主控制台代码页，cmd 重定向与 Git Bash 管道实测中文完好、
+# WSL interop 与 CP936 控制台两腿实测仍乱码，非 ASCII 保真不作为本 shim
+# 的已验证结论（session_id 实践为 ASCII UUID）。
 try { [Console]::InputEncoding = New-Object Text.UTF8Encoding $false } catch { }
 $raw = if ($input) { ($input -join "`n") } else { '' }
 $event = ''
