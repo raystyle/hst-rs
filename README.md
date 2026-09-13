@@ -118,7 +118,7 @@ hst trace agent claude      # 某家 agent 的操作块时间线
 
 ## 注意
 
-`hst init` 的 yolo 面（缺省用户级）会关掉 agent 的审批与沙箱且**全机所有项目生效**，只在自己信任的机器与账户上用；要收窄：`--yolo=partial` 危险操作仍确认、`--yolo=off` 全关、或 `--project-yolo` 收到单项目。oma 旧命令由过渡 stub 警告后转调 hst（release 兼容期同挂 oma-* stub 资产）。
+`hst init` 的 yolo 面（缺省用户级）会关掉 agent 的审批与沙箱且**全机所有项目生效**，只在自己信任的机器与账户上用；要收窄：`--yolo=partial` 危险操作仍确认、`--yolo=off` 全关、或 `--project-yolo` 收到单项目。oma 更名过渡期已结束（v1.1.3 起）：oma 旧命令与 oma-* stub 资产退役，环境变量一律 HST_*（旧 OMA_* 不再读）。
 
 ## 更多文档
 

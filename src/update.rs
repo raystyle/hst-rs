@@ -1,6 +1,6 @@
 //! hst 自更新（用户定调 2026-09-02：去 GitHub 升级新版本；封版前本地测试，
 //! releases 为空时走 `--git` 源码安装路径）。
-//! 机制见 S028：releases/latest API、资产命名约定 `oma-<triple>.(zip|tar.gz)`、
+//! 机制见 S028：releases/latest API、资产命名约定 `hst-<triple>.(zip|tar.gz)`、
 //! Windows 运行中自替换（rename 舞步）、Unix 原子 rename 覆盖。
 //! D16：`HST_MIRROR=<基址>` 镜像通道只覆盖 dev（镜像无 manifest，判新走
 //! `<基址>/hst/dev/<资产名>.sha256` 边车）；stable 与未设置时行为不变。
@@ -82,7 +82,7 @@ pub fn fetch_release(repo: &str, channel: Channel) -> Result<Release, String> {
 }
 
 /// Host target triple keywords for asset matching (keep in sync with the
-/// release asset naming convention: oma-<triple>.zip / .tar.gz).
+/// release asset naming convention: hst-<triple>.zip / .tar.gz).
 fn host_keywords() -> &'static [&'static str] {
     if cfg!(target_os = "windows") {
         &["windows-msvc", "windows"]
@@ -93,7 +93,7 @@ fn host_keywords() -> &'static [&'static str] {
     }
 }
 
-/// Pick the oma asset for this host from a release's asset list.
+/// Pick the hst asset for this host from a release's asset list.
 pub fn pick_asset(assets: &[Asset]) -> Option<&Asset> {
     let kws = host_keywords();
     let arch = if cfg!(target_arch = "aarch64") {
@@ -105,7 +105,7 @@ pub fn pick_asset(assets: &[Asset]) -> Option<&Asset> {
         .iter()
         .find(|a| {
             let n = a.name.to_ascii_lowercase();
-            n.starts_with("oma")
+            n.starts_with("hst")
                 && (n.ends_with(".zip") || n.ends_with(".tar.gz"))
                 && n.contains(arch)
                 && kws.iter().any(|k| n.contains(k))
@@ -113,7 +113,7 @@ pub fn pick_asset(assets: &[Asset]) -> Option<&Asset> {
         .or_else(|| {
             assets
                 .iter()
-                .find(|a| a.name.to_ascii_lowercase().starts_with("oma"))
+                .find(|a| a.name.to_ascii_lowercase().starts_with("hst"))
         })
 }
 
@@ -188,15 +188,8 @@ fn dev_is_current(release: &Release) -> bool {
 
 /// 镜像开关：`HST_MIRROR=<基址>`（去空白与尾斜杠）；未设/空 = None（行为与现状一致）。
 fn mirror_base() -> Option<String> {
-    // D29 兼容：旧 OMA_MIRROR 一个版本内仍读，读旧打 stderr 提示。
-    let v = match std::env::var("HST_MIRROR") {
-        Ok(v) => v,
-        Err(_) => std::env::var("OMA_MIRROR").ok().inspect(|_| {
-            eprintln!(
-                "hst: OMA_MIRROR is deprecated; rename it to HST_MIRROR (removed next release)"
-            );
-        })?,
-    };
+    // D45 oma 遗产清扫：旧 OMA_MIRROR 兼容读已删（D29 定的 1.1.0 窗口已过）。
+    let v = std::env::var("HST_MIRROR").ok()?;
     let v = v.trim().trim_end_matches('/');
     if v.is_empty() {
         None
@@ -214,11 +207,11 @@ fn host_asset_name() -> String {
         "x86_64"
     };
     if cfg!(target_os = "windows") {
-        format!("oma-{arch}-pc-windows-msvc.zip")
+        format!("hst-{arch}-pc-windows-msvc.zip")
     } else if cfg!(target_os = "macos") {
-        format!("oma-{arch}-apple-darwin.tar.gz")
+        format!("hst-{arch}-apple-darwin.tar.gz")
     } else {
-        format!("oma-{arch}-unknown-linux-gnu.tar.gz")
+        format!("hst-{arch}-unknown-linux-gnu.tar.gz")
     }
 }
 
@@ -294,7 +287,7 @@ fn dev_via_mirror(base: &str, force: bool) -> Result<MirrorStep, String> {
     let asset_url = mirror_asset_url(base, &name, anchor);
     println!("update.asset={name}");
     let tmp = std::env::temp_dir().join(format!(
-        "oma-update-{}-{}",
+        "hst-update-{}-{}",
         std::process::id(),
         name.replace('/', "_")
     ));
@@ -312,11 +305,11 @@ fn dev_via_mirror(base: &str, force: bool) -> Result<MirrorStep, String> {
     let extracted = if name.ends_with(".zip") {
         let out = tmp.with_extension("unpacked");
         crate::archive::extract_zip(&tmp, &out)?;
-        find_oma_bin(&out).ok_or("oma binary not found in archive")?
+        find_hst_bin(&out).ok_or("hst binary not found in archive")?
     } else {
         let out = tmp.with_extension("unpacked");
         crate::archive::extract_tar_gz(&tmp, &out)?;
-        find_oma_bin(&out).ok_or("oma binary not found in archive")?
+        find_hst_bin(&out).ok_or("hst binary not found in archive")?
     };
     let final_path = self_replace(&extracted)?;
     println!("update.replaced={}", final_path.display());
@@ -424,25 +417,25 @@ pub fn run(repo: &str, channel: Channel, git_mode: bool, force: bool) -> Result<
             v.sort();
             v.join(",")
         });
-        println!("update.hint=oma update --git 走源码安装");
+        println!("update.hint=hst self update --git 走源码安装");
         return Ok(());
     };
     println!("update.asset={}", asset.name);
     let tmp = std::env::temp_dir().join(format!(
-        "oma-update-{}-{}",
+        "hst-update-{}-{}",
         std::process::id(),
         asset.name.replace('/', "_")
     ));
     crate::install::download_asset(&asset.browser_download_url, &tmp)?;
-    // 压缩包解开找 oma 本体；裸二进制资产直接用。
+    // 压缩包解开找 hst 本体；裸二进制资产直接用。
     let extracted = if asset.name.ends_with(".zip") {
         let out = tmp.with_extension("unpacked");
         crate::archive::extract_zip(&tmp, &out)?;
-        find_oma_bin(&out).ok_or("oma binary not found in archive")?
+        find_hst_bin(&out).ok_or("hst binary not found in archive")?
     } else if asset.name.ends_with(".tar.gz") {
         let out = tmp.with_extension("unpacked");
         crate::archive::extract_tar_gz(&tmp, &out)?;
-        find_oma_bin(&out).ok_or("oma binary not found in archive")?
+        find_hst_bin(&out).ok_or("hst binary not found in archive")?
     } else {
         tmp.clone()
     };
@@ -455,11 +448,11 @@ pub fn run(repo: &str, channel: Channel, git_mode: bool, force: bool) -> Result<
     Ok(())
 }
 
-fn find_oma_bin(root: &Path) -> Option<PathBuf> {
+fn find_hst_bin(root: &Path) -> Option<PathBuf> {
     if root.is_file() {
         return Some(root.to_path_buf());
     }
-    let name = if cfg!(windows) { "oma.exe" } else { "oma" };
+    let name = if cfg!(windows) { "hst.exe" } else { "hst" };
     let direct = root.join(name);
     if direct.is_file() {
         return Some(direct);
@@ -516,26 +509,26 @@ mod tests {
                 })
                 .collect()
         };
-        // 期望来自命名约定（S028）：资产名即编译目标 oma-<triple>，
-        // 本机平台与架构的 oma 包优先。
+        // 期望来自命名约定（S028）：资产名即编译目标 hst-<triple>，
+        // 本机平台与架构的 hst 包优先。
         let assets = mk(&[
-            "oma-x86_64-unknown-linux-gnu.tar.gz",
-            "oma-aarch64-apple-darwin.tar.gz",
-            "oma-x86_64-pc-windows-msvc.zip",
+            "hst-x86_64-unknown-linux-gnu.tar.gz",
+            "hst-aarch64-apple-darwin.tar.gz",
+            "hst-x86_64-pc-windows-msvc.zip",
             "notes.txt",
         ]);
         let picked = pick_asset(&assets).unwrap();
         if cfg!(windows) {
-            assert_eq!(picked.name, "oma-x86_64-pc-windows-msvc.zip");
+            assert_eq!(picked.name, "hst-x86_64-pc-windows-msvc.zip");
         } else if cfg!(target_os = "macos") {
-            assert_eq!(picked.name, "oma-aarch64-apple-darwin.tar.gz");
+            assert_eq!(picked.name, "hst-aarch64-apple-darwin.tar.gz");
         } else {
-            assert_eq!(picked.name, "oma-x86_64-unknown-linux-gnu.tar.gz");
+            assert_eq!(picked.name, "hst-x86_64-unknown-linux-gnu.tar.gz");
         }
-        // 兜底：无平台匹配时拿任一 oma 资产（提示用户核对）。
-        let fb_assets = mk(&["oma-any.bin", "x.txt"]);
+        // 兜底：无平台匹配时拿任一 hst 资产（提示用户核对）。
+        let fb_assets = mk(&["hst-any.bin", "x.txt"]);
         let fallback = pick_asset(&fb_assets).unwrap();
-        assert_eq!(fallback.name, "oma-any.bin");
+        assert_eq!(fallback.name, "hst-any.bin");
     }
 
     // ===== D16 镜像通道纯函数 =====
@@ -546,17 +539,17 @@ mod tests {
         // windows 用 zip、其余 tar.gz），字面量断言本机期望。
         let name = host_asset_name();
         if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-            assert_eq!(name, "oma-x86_64-pc-windows-msvc.zip");
+            assert_eq!(name, "hst-x86_64-pc-windows-msvc.zip");
         } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
-            assert_eq!(name, "oma-aarch64-pc-windows-msvc.zip");
+            assert_eq!(name, "hst-aarch64-pc-windows-msvc.zip");
         } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-            assert_eq!(name, "oma-aarch64-apple-darwin.tar.gz");
+            assert_eq!(name, "hst-aarch64-apple-darwin.tar.gz");
         } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
-            assert_eq!(name, "oma-x86_64-apple-darwin.tar.gz");
+            assert_eq!(name, "hst-x86_64-apple-darwin.tar.gz");
         } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            assert_eq!(name, "oma-x86_64-unknown-linux-gnu.tar.gz");
+            assert_eq!(name, "hst-x86_64-unknown-linux-gnu.tar.gz");
         } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-            assert_eq!(name, "oma-aarch64-unknown-linux-gnu.tar.gz");
+            assert_eq!(name, "hst-aarch64-unknown-linux-gnu.tar.gz");
         } else {
             panic!("untested host target: {name}");
         }
@@ -566,20 +559,20 @@ mod tests {
     fn mirror_urls_trim_trailing_slash() {
         // 缓存击穿约定（ohmycloud 2026-09-08）：边车带 ?t= 时间戳、资产带
         // ?v=<边车锚>；两者基址尾斜杠归一。
-        let s = mirror_sidecar_url("https://env.ohmygh.com/", "oma-x.zip");
+        let s = mirror_sidecar_url("https://env.ohmygh.com/", "hst-x.zip");
         assert!(
-            s.starts_with("https://env.ohmygh.com/hst/dev/oma-x.zip.sha256?t="),
+            s.starts_with("https://env.ohmygh.com/hst/dev/hst-x.zip.sha256?t="),
             "sidecar url: {s}"
         );
         assert!(
-            s["https://env.ohmygh.com/hst/dev/oma-x.zip.sha256?t=".len()..]
+            s["https://env.ohmygh.com/hst/dev/hst-x.zip.sha256?t=".len()..]
                 .chars()
                 .all(|c| c.is_ascii_digit())
         );
-        let a = mirror_asset_url("https://env.ohmygh.com/", "oma-x.zip", "abc123");
-        assert_eq!(a, "https://env.ohmygh.com/hst/dev/oma-x.zip?v=abc123");
-        let s2 = mirror_sidecar_url("https://env.ohmygh.com", "oma-x.zip");
-        assert!(s2.starts_with("https://env.ohmygh.com/hst/dev/oma-x.zip.sha256?t="));
+        let a = mirror_asset_url("https://env.ohmygh.com/", "hst-x.zip", "abc123");
+        assert_eq!(a, "https://env.ohmygh.com/hst/dev/hst-x.zip?v=abc123");
+        let s2 = mirror_sidecar_url("https://env.ohmygh.com", "hst-x.zip");
+        assert!(s2.starts_with("https://env.ohmygh.com/hst/dev/hst-x.zip.sha256?t="));
     }
 
     #[test]
@@ -589,11 +582,11 @@ mod tests {
         let want = format!("sha256:{hex}");
         // 标准双空格加文件名
         assert_eq!(
-            parse_sidecar(&format!("{hex}  oma-x86_64-pc-windows-msvc.zip\n")).unwrap(),
+            parse_sidecar(&format!("{hex}  hst-x86_64-pc-windows-msvc.zip\n")).unwrap(),
             want
         );
         // 单空格容错
-        assert_eq!(parse_sidecar(&format!("{hex} oma.zip")).unwrap(), want);
+        assert_eq!(parse_sidecar(&format!("{hex} hst.zip")).unwrap(), want);
         // 大写哈希归一小写
         assert_eq!(parse_sidecar(&hex.to_ascii_uppercase()).unwrap(), want);
         // sha256: 前缀容错（大小写均收）
@@ -606,10 +599,10 @@ mod tests {
         // 空、非 hex、长度不符都报错（数据面失败，不走网络回落）。
         assert!(parse_sidecar("").is_err());
         assert!(parse_sidecar("   \n").is_err());
-        assert!(parse_sidecar("not-a-hash  oma.zip").is_err());
-        assert!(parse_sidecar("abcd  oma.zip").is_err());
+        assert!(parse_sidecar("not-a-hash  hst.zip").is_err());
+        assert!(parse_sidecar("abcd  hst.zip").is_err());
         assert!(parse_sidecar(
-            "zz7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  oma.zip"
+            "zz7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  hst.zip"
         )
         .is_err());
     }
@@ -619,7 +612,7 @@ mod tests {
         // GitHub 记录形如 sha256:ABC（大写），边车小写 hex：digest_matches
         // 口径下互认为同一版本。
         let hex = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        let parsed = parse_sidecar(&format!("{hex}  oma.zip")).unwrap();
+        let parsed = parse_sidecar(&format!("{hex}  hst.zip")).unwrap();
         assert!(digest_matches(
             Some(&format!("sha256:{}", hex.to_ascii_uppercase())),
             Some(&parsed)

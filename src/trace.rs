@@ -1,5 +1,5 @@
-//! oma trace：查询时联邦的四家会话日志检索（P0013，S019）。
-//! 直接读各家原生会话库并归一化——零采集设施、可回溯 oma 部署前的历史。
+//! hst trace：查询时联邦的四家会话日志检索（P0013，S019）。
+//! 直接读各家原生会话库并归一化——零采集设施、可回溯 hst 部署前的历史。
 //! 写库即归一化原则（S018 坑 3）：文件路径一律正斜杠；项目比较统一「正斜杠 + 小写」。
 
 use std::fs;
@@ -1210,7 +1210,7 @@ mod tests {
     fn first_line_timestamp_skips_meta_lines() {
         // D26 #5：claude jsonl 首行是 mode 元数据（无 timestamp），扫描应
         // 前进到首个带 timestamp 的行；全无返回 None。
-        let dir = std::env::temp_dir().join(format!("oma-trace-ts-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("hst-trace-ts-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let p = dir.join("s1.jsonl");

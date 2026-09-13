@@ -124,7 +124,7 @@
 - **hook 写状态加密钥拦截**：`hst hook`（状态落盘；block 级密钥 exit 2 拒调用）
 - **部署项目全套**：`hst init [--project PATH]`（yolo 加 hook/skill，幂等；hook 注册与 shim 常驻用户级 `~/.hst/hooks/`，状态按 session 分键写 `~/.hst/state/`，项目旧注册自动退役，零 hst 依赖可无痛轮换，D27/D28）
 - **部署 yolo 与非阻塞键**：`hst init --yolo[=full|partial|off]`（用户级）或 `hst init --project-yolo[=级别]`（项目级，两级显式互斥，D28 第 3 轮；D33 分级：full 全 bypass、partial 危险操作仍确认、off 摘 hst 落键，级别缺省 full）；`--pre-trust` 追加按项目信任库预写
-- **oma 自更新**：`hst self update [--stable] [--git]`（缺省 dev 滚动源，Windows rename 舞步；设 `OMA_MIRROR=<基址>` 走镜像 dev 段，边车 sha256 判新，网络失败回落 GitHub，D16）
+- **oma 自更新**：`hst self update [--stable] [--git]`（缺省 dev 滚动源，Windows rename 舞步；设 `HST_MIRROR=<基址>` 走镜像 dev 段（D45 起旧 OMA_* env 兼容读已删），边车 sha256 判新，网络失败回落 GitHub，D16）
 - **生成 hst 自身技能**：`hst skill [--write]`（从 clap 活命令树自适应渲染 SKILL.md，新命令自动出现；--write 落用户级 ~/.claude/skills/ohmyagents/，技能名随 D14 裁定保留旧牌，D22）
 - **生成补全**：`hst completions <shell>`
 - **检索对话历史**：`hst trace sessions|timeline|blocks|agent|file|search`（六视图联邦读四家原生会话库，只读，D19 恢复）

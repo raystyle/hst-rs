@@ -98,7 +98,7 @@ fn push_binary(out: &mut Vec<Finding>, agent: &str) {
             "binary",
             false,
             Path::new(agent),
-            "not on PATH, OMA_AGENT_PATH, OMA_*_BIN, or default locations",
+            "not on PATH, HST_AGENT_PATH, HST_*_BIN, or default locations",
         ),
     }
 }
@@ -516,7 +516,7 @@ fn push_statusline(
             "configured but hst-statusline.ps1 missing; rerun hst statusline".into(),
         )
     } else {
-        (Status::Ok, "oma bar configured".into())
+        (Status::Ok, "hst bar configured".into())
     };
     if pwsh_missing {
         detail.push_str("; pwsh not on PATH (bar will not render)");

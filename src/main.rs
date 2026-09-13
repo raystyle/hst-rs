@@ -46,7 +46,7 @@ enum Commands {
         )]
         project_yolo: Option<yolo::YoloLevel>,
         /// 预写用户家目录信任库（claude/codex/kimi/grok）
-        #[arg(long = "pre-trust", alias = "pretrust")]
+        #[arg(long = "pre-trust")]
         pretrust: bool,
         /// 项目根；默认当前目录
         #[arg(long)]
@@ -58,7 +58,7 @@ enum Commands {
         #[arg(long)]
         project: Option<PathBuf>,
     },
-    /// 检测本机已装哪些 agent（PATH、OMA_AGENT_PATH、OMA_*_BIN、hst 自管根、默认目录）
+    /// 检测本机已装哪些 agent（PATH、HST_AGENT_PATH、HST_*_BIN、hst 自管根、默认目录）
     Agents {
         #[command(subcommand)]
         cmd: Option<AgentsCmd>,
@@ -268,22 +268,6 @@ enum HookCmd {
 
 #[derive(Subcommand)]
 enum AgentsCmd {
-    /// 兼容别名（D29 一个小版本后删）：转发到一级命令 `hst statusline`
-    #[command(hide = true)]
-    Statusline {
-        /// 指定 agent（claude/codex/kimi/grok）；缺省四家都配
-        #[arg(value_name = "名")]
-        names: Vec<String>,
-        /// 打印 ~/.hst/statusline.toml 定制示例模板后退出（D18）
-        #[arg(long)]
-        example: bool,
-        /// 部署自备状态栏脚本（D18 整脚本替换；调用契约：首参 agent 名、stdin 喂 agent JSON、stdout 单行）
-        #[arg(long, conflicts_with_all = ["example", "builtin"])]
-        script: Option<PathBuf>,
-        /// 还原内嵌脚本（撤销 --script 的自备替换）
-        #[arg(long, conflicts_with = "example")]
-        builtin: bool,
-    },
     /// 四家 hook 与状态栏全平台无头验收（D17）：状态栏脚本直跑加 hook 无头落盘，任一非跳过项失败退出 1
     Verify {
         /// 指定 agent（claude/codex/grok/kimi）；缺省四家全验
@@ -343,12 +327,6 @@ fn run() -> Result<(), String> {
                 }
                 Ok(())
             }
-            Some(AgentsCmd::Statusline {
-                names,
-                example,
-                script,
-                builtin,
-            }) => cmd_agents_statusline(names, example, script, builtin),
             Some(AgentsCmd::Verify { names, timeout }) => cmd_agents_verify(names, timeout, false),
         },
         Commands::Hook { cmd } => match cmd {

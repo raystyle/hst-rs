@@ -1,12 +1,12 @@
-//! 用户级状态写入 shim（D27 自包含 + D28 用户级常驻）：hook 与 oma 二进制
+//! 用户级状态写入 shim（D27 自包含 + D28 用户级常驻）：hook 与 hst 二进制
 //! 解耦，注册与 shim 常驻 `~/.hst/hooks/`（用户裁 2026-09-11「hook 应用户
 //! 全局」，对齐 codex 用户层形态），各家 hook 注册指向 shim——state 通道
-//! 零 oma 依赖，oma 可任意时刻无痛升级轮换，未 init 的项目也有状态数据。
+//! 零 hst 依赖，hst 可任意时刻无痛升级轮换，未 init 的项目也有状态数据。
 //! 状态落 `~/.hst/state/` 按 session 分键（D28，防 herdr 多会话互踩）：
 //! 默认双写 `<agent>.json`（agent 最新，供无 session 标识的消费面）加
 //! `<agent>-<session>.json`（session 键，状态栏按当前会话直读）；
 //! SessionEnd 删本 session 键文件（GC，崩溃残留由 oma hook 侧陈旧清扫）。
-//! `OHMYAGENTS_STATE_FILE` 覆盖优先且互斥（单文件语义，verify 与测试用）。
+//! `HST_STATE_FILE` 覆盖优先且互斥（单文件语义，verify 与测试用）。
 //! secretguard 由 shim fail-open 委托加 M060a 白名单：PreToolUse /
 //! UserPromptSubmit 时 oma 在位则转发 payload，仅「exit 2 且 stderr 带
 //! `hst secretguard:` 前缀」判定为自判 block 透传 2 并回放原因；oma 故障
@@ -21,7 +21,7 @@
 
 /// Windows cmd shim，jq 形态（首选）。约定：`%1` = agent 名；stdin = hook
 /// payload JSON；状态根 = `%USERPROFILE%\.hst\state`（用户级常驻，D28）；
-/// `OHMYAGENTS_STATE_FILE` 覆盖优先（互斥单写）。字段提取与 state JSON
+/// `HST_STATE_FILE` 覆盖优先（互斥单写）。字段提取与 state JSON
 /// 生成都走 jq：`--arg` 传值让 jq 程序体内零双引号，绕开 cmd 引号地狱；
 /// ts 用 `now|floor` 取纪元秒（locale 无关）。guard 委托前 payload 留在
 /// 临时文件。
@@ -61,11 +61,11 @@ if /i "!ERAW!"=="Notification" (
 )
 set "STATE_DIR=%USERPROFILE%\.hst\state"
 set "TARGET="
-if defined OHMYAGENTS_STATE_FILE set "TARGET=%OHMYAGENTS_STATE_FILE%"
+if defined HST_STATE_FILE set "TARGET=%HST_STATE_FILE%"
 if not defined TARGET set "TARGET=%STATE_DIR%\%AGENT%.json"
 for %%d in ("!TARGET!") do if not exist "%%~fd\.." mkdir "%%~fd\.." 2>nul
 jq -n --arg state "!STATE!" --arg event "!ERAW!" --arg agent "%AGENT%" --arg session "!SID!" "{state:$state,event:$event,agent:$agent,session:$session,ts:(now|floor)}" > "!TARGET!"
-if not defined OHMYAGENTS_STATE_FILE (
+if not defined HST_STATE_FILE (
   if defined SID (
     copy /y "!TARGET!" "!STATE_DIR!\%AGENT%-!SID!.json" >nul 2>nul
     if /i "!ERAW!"=="SessionEnd" del "!STATE_DIR!\%AGENT%-!SID!.json" >nul 2>nul
@@ -167,11 +167,11 @@ if /i "!ERAW!"=="Notification" (
 )
 set "STATE_DIR=%USERPROFILE%\.hst\state"
 set "TARGET="
-if defined OHMYAGENTS_STATE_FILE set "TARGET=%OHMYAGENTS_STATE_FILE%"
+if defined HST_STATE_FILE set "TARGET=%HST_STATE_FILE%"
 if not defined TARGET set "TARGET=%STATE_DIR%\%AGENT%.json"
 for %%d in ("!TARGET!") do if not exist "%%~fd\.." mkdir "%%~fd\.." 2>nul
 >"!TARGET!" echo {"state":"!STATE!","event":"!ERAW!","agent":"%AGENT%","session":"!SID!","ts":0}
-if not defined OHMYAGENTS_STATE_FILE (
+if not defined HST_STATE_FILE (
   if defined SID (
     copy /y "!TARGET!" "!STATE_DIR!\%AGENT%-!SID!.json" >nul 2>nul
     if /i "!ERAW!"=="SessionEnd" del "!STATE_DIR!\%AGENT%-!SID!.json" >nul 2>nul
@@ -232,8 +232,8 @@ case "$event" in
     ;;
   *) state=unknown ;;
 esac
-if [ -n "$OHMYAGENTS_STATE_FILE" ]; then
-  target="$OHMYAGENTS_STATE_FILE"
+if [ -n "$HST_STATE_FILE" ]; then
+  target="$HST_STATE_FILE"
 else
   [ -n "$HOME" ] || exit 0
   state_dir="$HOME/.hst/state"
@@ -243,7 +243,7 @@ fi
 ts="$(date +%s)"
 printf '{"state":"%s","event":"%s","agent":"%s","session":"%s","ts":%s}\n' \
   "$state" "$event" "$agent" "$sid" "$ts" > "$target"
-if [ -z "$OHMYAGENTS_STATE_FILE" ] && [ -n "$sid" ]; then
+if [ -z "$HST_STATE_FILE" ] && [ -n "$sid" ]; then
   keyed="$state_dir/$agent-$sid.json"
   cp -f "$target" "$keyed"
   if [ "$event" = "sessionend" ]; then rm -f "$keyed"; fi
@@ -338,7 +338,7 @@ switch ($event) {
   default { $state = 'unknown' }
 }
 if ($event -eq 'Notification' -and $raw -match 'permission') { $state = 'blocked' }
-$override = "$env:OHMYAGENTS_STATE_FILE"
+$override = "$env:HST_STATE_FILE"
 $stateDir = Join-Path $env:USERPROFILE '.hst\state'
 if ($override) {
   $target = $override
@@ -471,6 +471,25 @@ pub fn deploy_shims_with(
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&sh, std::fs::Permissions::from_mode(0o755));
     }
+    // D45 oma 遗产清扫：pristine 合并搬进用户根的旧名 shim（oma-state.*）
+    // 幂等删除——P0047 观察面二收口（新名四件全落齐后旧名件再无消费面）。
+    for legacy in [
+        "oma-state.cmd",
+        "oma-state-grok.cmd",
+        "oma-state.sh",
+        "oma-state.ps1",
+    ] {
+        let p = dir.join(legacy);
+        if p.exists() {
+            match std::fs::remove_file(&p) {
+                Ok(()) => warns.push(format!(
+                    "retired legacy shim {} (oma-era name, D45 sweep)",
+                    p.display()
+                )),
+                Err(e) => warns.push(format!("could not retire legacy shim {}: {e}", p.display())),
+            }
+        }
+    }
     Ok((wrote, warns))
 }
 
@@ -492,7 +511,7 @@ mod tests {
                 body.contains(r#"copy /y "!TARGET!" "!STATE_DIR!\%AGENT%-!SID!.json""#),
                 "session-keyed twin write"
             );
-            assert!(body.contains("OHMYAGENTS_STATE_FILE"), "env override wins");
+            assert!(body.contains("HST_STATE_FILE"), "env override wins");
             assert!(
                 body.contains("hst hook status --agent"),
                 "secretguard delegation"
@@ -695,7 +714,7 @@ mod tests {
                     shim.display().to_string().replace('\\', "/")
                 ))
                 .env("PATH", format!("{};{}", fake.display(), path))
-                .env("OHMYAGENTS_STATE_FILE", &state)
+                .env("HST_STATE_FILE", &state)
                 .env_remove("HST_ROOT")
                 .env_remove("GROK_SESSION_ID")
                 .stdin(Stdio::piped())
@@ -753,7 +772,7 @@ mod tests {
             let mut child = Command::new(&shim)
                 .arg("claude")
                 .env("PATH", format!("{}:{}", fake.display(), path))
-                .env("OHMYAGENTS_STATE_FILE", &state)
+                .env("HST_STATE_FILE", &state)
                 .env_remove("HST_ROOT")
                 .env_remove("GROK_SESSION_ID")
                 .stdin(Stdio::piped())

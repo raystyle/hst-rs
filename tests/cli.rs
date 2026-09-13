@@ -12,14 +12,14 @@ use predicates::str::contains;
 /// temp dir.
 static NEXT_TEST_DIR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-fn oma() -> Command {
+fn hst() -> Command {
     Command::cargo_bin("hst").unwrap()
 }
 
 #[test]
 fn help_lists_the_deploy_surface() {
     // 命令面契约（D15 收窄、D19 恢复 trace）：帮助里是部署配置面加只读检索面。
-    let out = oma()
+    let out = hst()
         .args(["--help"])
         .assert()
         .success()
@@ -45,7 +45,7 @@ fn trace_sessions_on_empty_project_is_zero() {
     // A fresh temp project has no agent sessions: trace must exit 0 with a
     // zero count (read-only federation over the native session stores).
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-trace-{}-{}-{}",
+        "hst-cli-trace-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -54,13 +54,13 @@ fn trace_sessions_on_empty_project_is_zero() {
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&tmp).unwrap();
-    oma()
+    hst()
         .args(["trace", "sessions", "--project"])
         .arg(&tmp)
         .assert()
         .success()
         .stdout(contains("trace.sessions.count=0"));
-    oma()
+    hst()
         .args(["trace", "timeline", "--project"])
         .arg(&tmp)
         .assert()
@@ -77,7 +77,7 @@ fn trace_formats_and_pagination_markers() {
     // HST_TRACE_HOME 重定向会话库根到夹具，.claude/projects/<slug>/ 下三
     // 会话各两轮 Edit 工具调用（timeline 6 事件、blocks 6 块）。
     let cwd = std::env::temp_dir().join(format!(
-        "oma-cli-trace-fmt-{}-{}-{}",
+        "hst-cli-trace-fmt-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -125,7 +125,7 @@ fn trace_formats_and_pagination_markers() {
         // --project 钉测试侧拼写：macOS 的 TMPDIR 是符号链接（/var 到
         // /private/var），子进程 getcwd 会解析成真实路径，slug 随之漂移；
         // 显式传参与夹具同串，三平台同形。
-        let out = oma()
+        let out = hst()
             .current_dir(&cwd)
             .env("HST_TRACE_HOME", &home)
             .args(args)
@@ -185,7 +185,7 @@ fn trace_formats_and_pagination_markers() {
 
 #[test]
 fn agents_lists_detection_lines() {
-    oma()
+    hst()
         .args(["agents"])
         .assert()
         .success()
@@ -197,11 +197,11 @@ fn agents_lists_detection_lines() {
 
 #[test]
 fn hook_is_silent_without_state_env() {
-    // Outside an oma session there is no OHMYAGENTS_STATE_FILE: the hook
+    // Outside an hst session there is no HST_STATE_FILE: the hook
     // entry must stay silent and exit 0 (never fail the agent session).
-    oma()
+    hst()
         .args(["hook", "status", "blocked"])
-        .env_remove("OHMYAGENTS_STATE_FILE")
+        .env_remove("HST_STATE_FILE")
         .assert()
         .success();
 }
@@ -209,22 +209,22 @@ fn hook_is_silent_without_state_env() {
 #[test]
 fn hook_secret_guard_blocks_with_exit_2() {
     // S030：PreToolUse 命中 block 级密钥 → exit 2（agent 侧拒工具调用）。
-    // token 运行时拼接构造，测试源码不落字面密钥（防线 5）。OMA_HOME 钉
+    // token 运行时拼接构造，测试源码不落字面密钥（防线 5）。HST_ROOT 钉
     // 临时根：D28 用户级状态写不落真实家。
     let tok = format!("{}{}", "ghp_", "abcdefghijklmnopqrstuvwxyz0123456789");
     let payload = format!(
         "{{\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{{\"command\":\"curl -H bearauth:{tok} https://x\"}}}}"
     );
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-hook-guard-{}-{}",
+        "hst-cli-hook-guard-{}-{}",
         std::process::id(),
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&tmp).unwrap();
-    oma()
+    hst()
         .args(["hook", "status", "--agent", "claude"])
-        .env_remove("OHMYAGENTS_STATE_FILE")
-        .env_remove("OHMYAGENTS_AGENT")
+        .env_remove("HST_STATE_FILE")
+        .env_remove("HST_AGENT")
         .env("HST_ROOT", &tmp)
         .write_stdin(payload)
         .assert()
@@ -236,7 +236,7 @@ fn hook_secret_guard_blocks_with_exit_2() {
 #[test]
 fn doctor_blocks_on_a_fresh_project_and_says_so() {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-doctor-{}-{}-{}",
+        "hst-cli-doctor-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -247,7 +247,7 @@ fn doctor_blocks_on_a_fresh_project_and_says_so() {
     std::fs::create_dir_all(&tmp).unwrap();
     // A fresh project has no yolo keys: doctor exits 1 by contract.
     // CPU 能力段恒在（S021）：agent=cpu check=caps。
-    oma()
+    hst()
         .args(["doctor", "--project"])
         .arg(&tmp)
         .assert()
@@ -261,7 +261,7 @@ fn doctor_blocks_on_a_fresh_project_and_says_so() {
 #[test]
 fn init_full_deploys_hooks_skills_and_yolo() {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-{}-{}-{}",
+        "hst-cli-init-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -270,16 +270,16 @@ fn init_full_deploys_hooks_skills_and_yolo() {
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&tmp).unwrap();
-    // D28 隔离缝：用户级注册面落临时家目录与 oma 根，不碰真实家。
+    // D28 隔离缝：用户级注册面落临时家目录与 hst 根，不碰真实家。
     let user = tmp.join("fake-user-home");
-    let oma_root = tmp.join("fake-oma-home");
+    let hst_root = tmp.join("fake-hst-home");
     std::fs::create_dir_all(&user).unwrap();
-    std::fs::create_dir_all(&oma_root).unwrap();
-    oma()
+    std::fs::create_dir_all(&hst_root).unwrap();
+    hst()
         .args(["init", "--project"])
         .arg(&tmp.join("proj"))
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &oma_root)
+        .env("HST_ROOT", &hst_root)
         .assert()
         .success()
         .stdout(contains("init.scope=full"))
@@ -287,7 +287,7 @@ fn init_full_deploys_hooks_skills_and_yolo() {
         .stdout(contains("init.hooks.form=user"));
     let proj = tmp.join("proj");
     std::fs::create_dir_all(&proj).unwrap();
-    // claude USER registration shape: exactly one oma handler per event, a
+    // claude USER registration shape: exactly one hst handler per event, a
     // single command-line string (Grok imports this file; exec form plus
     // args is ParserError on Windows PowerShell, M047), pointing at the
     // user-level shim (D28).
@@ -303,7 +303,7 @@ fn init_full_deploys_hooks_skills_and_yolo() {
             .flat_map(|g| g["hooks"].as_array().unwrap().iter())
             .filter(|h| h["command"].as_str().is_some_and(|c| c.contains("hst")))
             .collect();
-        assert_eq!(ours.len(), 1, "one oma handler per event");
+        assert_eq!(ours.len(), 1, "one hst handler per event");
         assert!(
             ours[0].get("args").is_none(),
             "Grok PowerShell ParserError if command is the exe and args follow"
@@ -319,9 +319,9 @@ fn init_full_deploys_hooks_skills_and_yolo() {
             "foreign-OS path must not survive: {cmd}"
         );
     }
-    // shims 常驻 oma 根 hooks/（D28）。
-    assert!(oma_root.join("hooks").join("hst-state.cmd").exists());
-    assert!(oma_root.join("hooks").join("hst-state.sh").exists());
+    // shims 常驻 hst 根 hooks/（D28）。
+    assert!(hst_root.join("hooks").join("hst-state.cmd").exists());
+    assert!(hst_root.join("hooks").join("hst-state.sh").exists());
     // 四家用户级注册面落齐（kimi 是 [[hooks]] 数组、codex 带信任预种）。
     for rel in [
         ".claude/settings.json",
@@ -373,7 +373,7 @@ fn init_full_deploys_hooks_skills_and_yolo() {
     // kimi 项目 config 不再被任何面写入（hook 与 yolo 都在用户级）。
     // --yolo narrows to keys only: no hook files.
     let tmp2 = std::env::temp_dir().join(format!(
-        "oma-cli-init-yolo-{}-{}-{}",
+        "hst-cli-init-yolo-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -384,11 +384,11 @@ fn init_full_deploys_hooks_skills_and_yolo() {
     std::fs::create_dir_all(&tmp2).unwrap();
     let user2 = tmp2.join("fake-user-home");
     std::fs::create_dir_all(&user2).unwrap();
-    oma()
+    hst()
         .args(["init", "--yolo", "--project"])
         .arg(&tmp2.join("proj"))
         .env("HST_USER_HOME", &user2)
-        .env("HST_ROOT", &tmp2.join("fake-oma-home"))
+        .env("HST_ROOT", &tmp2.join("fake-hst-home"))
         .assert()
         .success()
         .stdout(contains("init.scope=yolo"))
@@ -423,7 +423,7 @@ fn init_retires_v053_project_registrations() {
     // D28 迁移：v0.5.3 形项目（项目注册 + 项目 shim）经一次 init 退役，
     // 外来 hook 保留。
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-retire-{}-{}-{}",
+        "hst-cli-init-retire-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -445,7 +445,7 @@ fn init_retires_v053_project_registrations() {
     std::fs::create_dir_all(&shims).unwrap();
     std::fs::write(shims.join("hst-state.cmd"), "rem generated by oma init\r\n").unwrap();
     std::fs::write(shims.join("hst-state.sh"), "# generated by oma init\n").unwrap();
-    oma()
+    hst()
         .args(["init", "--project"])
         .arg(&proj)
         .env("HST_USER_HOME", &tmp.join("user"))
@@ -477,18 +477,18 @@ fn init_project_yolo_writes_project_scope_only() {
     // D28 第 3 轮：yolo 两级显式。--project-yolo 写项目面（claude/codex/
     // kimi 项目配置），不碰用户级；与 --yolo 互斥（退出 2）。
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-pyolo-{}-{}",
+        "hst-cli-init-pyolo-{}-{}",
         std::process::id(),
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     let user = tmp.join("fake-user-home");
     let proj = tmp.join("proj");
     std::fs::create_dir_all(&user).unwrap();
-    oma()
+    hst()
         .args(["init", "--project-yolo", "--project"])
         .arg(&proj)
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &tmp.join("fake-oma-home"))
+        .env("HST_ROOT", &tmp.join("fake-hst-home"))
         .assert()
         .success()
         .stdout(contains("init.scope=yolo-project"));
@@ -510,7 +510,7 @@ fn init_project_yolo_writes_project_scope_only() {
         "--project-yolo must not touch user level"
     );
     // 与 --yolo 互斥：clap 退出 2。
-    oma()
+    hst()
         .args(["init", "--yolo", "--project-yolo", "--project"])
         .arg(&proj)
         .env("HST_USER_HOME", &user)
@@ -521,27 +521,26 @@ fn init_project_yolo_writes_project_scope_only() {
 }
 
 #[test]
-fn init_pretrust_hyphen_canonical_and_legacy_alias_both_parse() {
-    // D32：canonical 拼写 --pre-trust，旧 --pretrust 隐藏别名兼容（1.1.0 清）。
+fn init_pretrust_canonical_parses_and_legacy_alias_is_removed() {
+    // D32 canonical 拼写 --pre-trust；D45 oma 遗产清扫：旧 --pretrust 隐藏
+    // 别名已删（1.1.0 窗口已过），现在应被 clap 拒。
     // kv 标记 init.pretrust.* 不随拼写变（机器面冻结，ohmycloud 消费）。
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-pretrust-{}-{}",
+        "hst-cli-init-pretrust-{}-{}",
         std::process::id(),
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     let user = tmp.join("fake-user-home");
     let proj = tmp.join("proj");
     std::fs::create_dir_all(&user).unwrap();
-    for flag in ["--pre-trust", "--pretrust"] {
-        oma()
-            .args(["init", flag, "--project"])
-            .arg(&proj)
-            .env("HST_USER_HOME", &user)
-            .env("HST_ROOT", &tmp.join("fake-oma-home"))
-            .assert()
-            .success()
-            .stdout(contains("init.pretrust=wrote"));
-    }
+    hst()
+        .args(["init", "--pre-trust", "--project"])
+        .arg(&proj)
+        .env("HST_USER_HOME", &user)
+        .env("HST_ROOT", &tmp.join("fake-hst-home"))
+        .assert()
+        .success()
+        .stdout(contains("init.pretrust=wrote"));
     // 信任库真落用户家（claude.json 双 hasTrust* 键）。
     let cj: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(user.join(".claude.json")).unwrap()).unwrap();
@@ -554,8 +553,17 @@ fn init_pretrust_hyphen_canonical_and_legacy_alias_both_parse() {
             })),
         "pretrust wrote both claude trust keys: {cj}"
     );
-    // help 面只露 canonical 拼写（别名隐藏）。
-    oma()
+    // 旧拼写已被删（D45）：clap 拒之。
+    hst()
+        .args(["init", "--pretrust", "--project"])
+        .arg(&proj)
+        .env("HST_USER_HOME", &user)
+        .env("HST_ROOT", &tmp.join("fake-hst-home"))
+        .assert()
+        .failure()
+        .code(2);
+    // help 面只露 canonical 拼写。
+    hst()
         .args(["init", "--help"])
         .assert()
         .success()
@@ -568,30 +576,30 @@ fn init_pretrust_hyphen_canonical_and_legacy_alias_both_parse() {
 fn init_yolo_partial_and_off_level_markers() {
     // D33：--yolo=<full|partial|off> 取值式分级；off 摘 hst 落键。
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-lvl-{}-{}",
+        "hst-cli-init-lvl-{}-{}",
         std::process::id(),
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     let user = tmp.join("fake-user-home");
-    let oma_root = tmp.join("fake-oma-home");
+    let hst_root = tmp.join("fake-hst-home");
     let proj = tmp.join("proj");
     std::fs::create_dir_all(&user).unwrap();
-    std::fs::create_dir_all(&oma_root).unwrap();
+    std::fs::create_dir_all(&hst_root).unwrap();
     // 非法级别：clap 退出 2。
-    oma()
+    hst()
         .args(["init", "--yolo=bogus", "--project"])
         .arg(&proj)
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &oma_root)
+        .env("HST_ROOT", &hst_root)
         .assert()
         .failure()
         .code(2);
     // partial：标记与四家分级落键。
-    oma()
+    hst()
         .args(["init", "--yolo=partial", "--project"])
         .arg(&proj)
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &oma_root)
+        .env("HST_ROOT", &hst_root)
         .assert()
         .success()
         .stdout(contains("init.scope=yolo"))
@@ -619,11 +627,11 @@ fn init_yolo_partial_and_off_level_markers() {
     let grok = std::fs::read_to_string(user.join(".grok").join("config.toml")).unwrap();
     assert!(grok.contains("auto"), "grok partial mode: {grok}");
     // off：retired 行加键摘除（kimi ours-only 文件删除）。
-    oma()
+    hst()
         .args(["init", "--yolo=off", "--project"])
         .arg(&proj)
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &oma_root)
+        .env("HST_ROOT", &hst_root)
         .assert()
         .success()
         .stdout(contains("init.yolo.level=off"))
@@ -643,7 +651,7 @@ fn init_yolo_partial_and_off_level_markers() {
 fn init_project_yolo_off_retires_project_keys() {
     // D33：项目级 off 走 retire_project_yolo（ours 等值摘除）。
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-pyoff-{}-{}",
+        "hst-cli-init-pyoff-{}-{}",
         std::process::id(),
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
@@ -654,7 +662,7 @@ fn init_project_yolo_off_retires_project_keys() {
         vec!["init", "--project-yolo", "--project"],
         vec!["init", "--project-yolo=off", "--project"],
     ] {
-        let mut cmd = oma();
+        let mut cmd = hst();
         cmd.args(&args).arg(&proj).env("HST_USER_HOME", &user);
         cmd.assert()
             .success()
@@ -674,7 +682,7 @@ fn init_project_yolo_off_retires_project_keys() {
 #[test]
 fn init_rerun_is_byte_idempotent() {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-init-idem-{}-{}-{}",
+        "hst-cli-init-idem-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -684,9 +692,9 @@ fn init_rerun_is_byte_idempotent() {
     ));
     std::fs::create_dir_all(&tmp).unwrap();
     let user = tmp.join("fake-user-home");
-    let oma_root = tmp.join("fake-oma-home");
+    let hst_root = tmp.join("fake-hst-home");
     std::fs::create_dir_all(&user).unwrap();
-    std::fs::create_dir_all(&oma_root).unwrap();
+    std::fs::create_dir_all(&hst_root).unwrap();
     // D28：幂等判据覆盖用户级注册五件。
     let rels = [
         ".claude/settings.json",
@@ -700,20 +708,20 @@ fn init_rerun_is_byte_idempotent() {
             .map(|r| std::fs::read_to_string(base.join(r)).unwrap())
             .collect()
     };
-    oma()
+    hst()
         .args(["init", "--project"])
         .arg(&tmp.join("proj"))
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &oma_root)
+        .env("HST_ROOT", &hst_root)
         .assert()
         .success();
     let after_first = read_all(&user);
     // Second run rewrites nothing: the hook registrations converge.
-    oma()
+    hst()
         .args(["init", "--project"])
         .arg(&tmp.join("proj"))
         .env("HST_USER_HOME", &user)
-        .env("HST_ROOT", &oma_root)
+        .env("HST_ROOT", &hst_root)
         .assert()
         .success()
         .stdout(contains("init.hooks.wrote.count=0"));
@@ -724,8 +732,8 @@ fn init_rerun_is_byte_idempotent() {
 #[test]
 fn dies_statusline_unknown_agent() {
     // Unknown names fail before any home config is touched.
-    oma()
-        .args(["agents", "statusline", "no-such-agent"])
+    hst()
+        .args(["statusline", "no-such-agent"])
         .assert()
         .failure()
         .stderr(contains("claude/codex/kimi/grok"));
@@ -736,8 +744,8 @@ fn statusline_example_prints_customization_template() {
     // D18: --example 打印带注释模板后干净退出，不碰任何配置面。
     // D40：模板改双排面（segments / segments2 / single_line 三键）。
     // D43：三行精修（一行 dir/git、context 带 token 绝对值）。
-    oma()
-        .args(["agents", "statusline", "--example"])
+    hst()
+        .args(["statusline", "--example"])
         .assert()
         .success()
         .stdout(contains("~/.hst/statusline.toml"))
@@ -752,12 +760,12 @@ fn statusline_example_prints_customization_template() {
 #[test]
 fn dies_statusline_script_conflicts_with_builtin_and_example() {
     // clap 互斥：--script 与 --builtin / --example 不能同场。
-    oma()
-        .args(["agents", "statusline", "--script", "x.ps1", "--builtin"])
+    hst()
+        .args(["statusline", "--script", "x.ps1", "--builtin"])
         .assert()
         .failure();
-    oma()
-        .args(["agents", "statusline", "--script", "x.ps1", "--example"])
+    hst()
+        .args(["statusline", "--script", "x.ps1", "--example"])
         .assert()
         .failure();
 }
@@ -765,8 +773,8 @@ fn dies_statusline_script_conflicts_with_builtin_and_example() {
 #[test]
 fn dies_statusline_script_unknown_agent_fails_before_deploy() {
     // 未知名在任何部署动作前快败（自备脚本不被触碰）。
-    oma()
-        .args(["agents", "statusline", "no-such-agent", "--script", "x.ps1"])
+    hst()
+        .args(["statusline", "no-such-agent", "--script", "x.ps1"])
         .assert()
         .failure()
         .stderr(contains("claude/codex/kimi/grok"));
@@ -775,7 +783,7 @@ fn dies_statusline_script_unknown_agent_fails_before_deploy() {
 #[test]
 fn completions_emit_shell_scripts() {
     for shell in ["bash", "powershell"] {
-        let out = oma()
+        let out = hst()
             .args(["completions", shell])
             .assert()
             .success()
@@ -785,10 +793,10 @@ fn completions_emit_shell_scripts() {
         let s = String::from_utf8_lossy(&out);
         assert!(
             !s.is_empty() && s.contains("hst"),
-            "{shell} script mentions oma"
+            "{shell} script mentions hst"
         );
     }
-    let out = oma()
+    let out = hst()
         .args(["completions", "bash"])
         .assert()
         .success()
@@ -803,7 +811,7 @@ fn completions_emit_shell_scripts() {
 #[test]
 fn format_json_doctor_envelope_parses_and_blocked_exits_one() {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-fmt-doctor-{}-{}",
+        "hst-fmt-doctor-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -811,7 +819,7 @@ fn format_json_doctor_envelope_parses_and_blocked_exits_one() {
             .as_millis()
     ));
     std::fs::create_dir_all(&tmp).unwrap();
-    let out = oma()
+    let out = hst()
         .args(["--format", "json", "doctor", "--project"])
         .arg(&tmp)
         .assert()
@@ -828,7 +836,7 @@ fn format_json_doctor_envelope_parses_and_blocked_exits_one() {
 
 #[test]
 fn format_jsonl_agents_rows_each_parse() {
-    let out = oma()
+    let out = hst()
         .args(["--format", "jsonl", "agents"])
         .assert()
         .success()
@@ -856,7 +864,7 @@ fn format_jsonl_agents_rows_each_parse() {
 #[test]
 fn json_shorthand_works_after_subcommand() {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-fmt-sh-{}-{}",
+        "hst-fmt-sh-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -864,7 +872,7 @@ fn json_shorthand_works_after_subcommand() {
             .as_millis()
     ));
     std::fs::create_dir_all(&tmp).unwrap();
-    let out = oma()
+    let out = hst()
         .args(["doctor", "--json", "--project"])
         .arg(&tmp)
         .assert()
@@ -877,34 +885,34 @@ fn json_shorthand_works_after_subcommand() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-// ===== `oma agents verify`（D17 无头验收）=====
+// ===== `hst agents verify`（D17 无头验收）=====
 
 #[test]
 fn dies_verify_unknown_agent() {
     // 未知名在任何验收动作前快败，报支持面。
-    oma()
+    hst()
         .args(["agents", "verify", "no-such-agent"])
         .assert()
         .failure()
         .stderr(contains("claude/codex/grok/kimi"));
 }
 
-/// 全 skip 环境的 env 罩子：PATH 空目录加 OMA_HOME 空目录，摘掉全部 agent 指引
+/// 全 skip 环境的 env 罩子：PATH 空目录加 HST_ROOT 空目录，摘掉全部 agent 指引
 /// 环境变量。默认目录源（~/.local/bin 等）无法罩住（dirs 走系统 API 不看
 /// env），所以调用方要先自检仍检出 installed 就 skip。
 fn verify_empty_env(cmd: &mut Command, sandbox: &std::path::Path) {
     cmd.env("PATH", sandbox.join("empty-path"))
-        .env("HST_ROOT", sandbox.join("empty-oma-home"));
+        .env("HST_ROOT", sandbox.join("empty-hst-home"));
     for key in [
-        "OMA_AGENT_PATH",
+        "HST_AGENT_PATH",
         "CODEX_HOME",
-        "OMA_CLAUDE_BIN",
+        "HST_CLAUDE_BIN",
         "CLAUDE_BIN",
-        "OMA_CODEX_BIN",
+        "HST_CODEX_BIN",
         "CODEX_BIN",
-        "OMA_GROK_BIN",
+        "HST_GROK_BIN",
         "GROK_BIN",
-        "OMA_KIMI_BIN",
+        "HST_KIMI_BIN",
         "KIMI_BIN",
         "KIMI_CODE_BIN",
     ] {
@@ -915,7 +923,7 @@ fn verify_empty_env(cmd: &mut Command, sandbox: &std::path::Path) {
 #[test]
 fn verify_all_skip_exits_zero_when_no_agents_detected() {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-verify-skip-{}-{}-{}",
+        "hst-cli-verify-skip-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -924,9 +932,9 @@ fn verify_all_skip_exits_zero_when_no_agents_detected() {
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::create_dir_all(tmp.join("empty-path")).unwrap();
-    std::fs::create_dir_all(tmp.join("empty-oma-home")).unwrap();
+    std::fs::create_dir_all(tmp.join("empty-hst-home")).unwrap();
     // 自检：罩子下仍有 agent 检出（默认目录源），本机造不出全缺，skip。
-    let mut probe = oma();
+    let mut probe = hst();
     verify_empty_env(&mut probe, &tmp);
     let out = probe
         .args(["agents"])
@@ -940,7 +948,7 @@ fn verify_all_skip_exits_zero_when_no_agents_detected() {
         let _ = std::fs::remove_dir_all(&tmp);
         return;
     }
-    let mut cmd = oma();
+    let mut cmd = hst();
     verify_empty_env(&mut cmd, &tmp);
     cmd.args(["agents", "verify"])
         .assert()
@@ -966,7 +974,7 @@ fn verify_live_headless_acceptance_for_installed_agents() {
     // 闸门（R004）：依赖真 agent 二进制，消耗极少量真实 token；binary 不在
     // 则 eprintln skip。判据只押 hook state 落盘（SessionStart /
     // UserPromptSubmit 先于模型调用，S033）。
-    let out = oma()
+    let out = hst()
         .args(["agents"])
         .assert()
         .success()
@@ -985,7 +993,7 @@ fn verify_live_headless_acceptance_for_installed_agents() {
         }
         if !matches!(name, "grok" | "kimi") {
             ran += 1;
-            oma()
+            hst()
                 .args(["agents", "verify", name, "--timeout", "90"])
                 .assert()
                 .success()
@@ -994,7 +1002,7 @@ fn verify_live_headless_acceptance_for_installed_agents() {
         }
         // grok / kimi：跑一次不押断言，hook 层 ok 才计数；不成 = 无头鉴权
         // 不可用（环境事实），skip 带首条 reason 行供面板观察。
-        let output = oma()
+        let output = hst()
             .args(["agents", "verify", name, "--timeout", "90"])
             .assert()
             .get_output()
@@ -1027,7 +1035,7 @@ fn deployed_state_shim_roundtrips_stdin_payload() {
     // spawner 也是直管道形态）。session 用 ASCII（H1 对齐实测口径：非
     // ASCII 解码随宿主控制台代码页，不作跨宿主断言）。
     let tmp = std::env::temp_dir().join(format!(
-        "oma-cli-shim-rt-{}-{}",
+        "hst-cli-shim-rt-{}-{}",
         std::process::id(),
         NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
@@ -1075,7 +1083,7 @@ fn deployed_state_shim_roundtrips_stdin_payload() {
         c
     };
     let mut child = child
-        .env("OHMYAGENTS_STATE_FILE", &state_file)
+        .env("HST_STATE_FILE", &state_file)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -1103,7 +1111,7 @@ fn deployed_state_shim_roundtrips_stdin_payload() {
 
 #[test]
 fn json_and_format_are_mutually_exclusive() {
-    oma()
+    hst()
         .args(["--json", "--format", "json", "agents"])
         .assert()
         .failure()
@@ -1112,10 +1120,10 @@ fn json_and_format_are_mutually_exclusive() {
 
 #[test]
 fn structured_error_goes_to_stderr_as_single_line_json() {
-    // oma 契约（与 ome 裸数据的分道点）：结构化模式 stderr 单行 JSON 错误行
+    // hst 契约（与 ome 裸数据的分道点）：结构化模式 stderr 单行 JSON 错误行
     // （人称与机器双通道），退出码非 0。
-    let out = oma()
-        .args(["--format", "json", "agents", "statusline", "no-such-agent"])
+    let out = hst()
+        .args(["--format", "json", "statusline", "no-such-agent"])
         .assert()
         .failure()
         .get_output()

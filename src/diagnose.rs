@@ -43,27 +43,14 @@ pub struct Gateway {
 }
 
 /// 网关发现：env 覆盖 > claude 配置 > codex 配置；都无则带 CTA 硬错。
-/// env 兼容读：新名优先，旧名兜底（读旧打 stderr 提示，一个版本后删）。
-fn read_env_compat(new_key: &str, old_key: &str) -> Option<String> {
-    if let Ok(v) = std::env::var(new_key) {
-        if !v.is_empty() {
-            return Some(v);
-        }
-    }
-    std::env::var(old_key)
-        .ok()
-        .filter(|s| !s.is_empty())
-        .inspect(|_| {
-            eprintln!(
-                "hst: {old_key} is deprecated; rename it to {new_key} (removed next release)"
-            );
-        })
+fn read_env_nonempty(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|s| !s.is_empty())
 }
 
 pub fn discover_gateway() -> Result<Gateway, String> {
-    // D29 兼容：旧 OMA_GATEWAY_* 一个版本内仍读，读旧打 stderr 提示。
-    let env_url = read_env_compat("HST_GATEWAY_URL", "OMA_GATEWAY_URL");
-    let env_key = read_env_compat("HST_GATEWAY_KEY", "OMA_GATEWAY_KEY");
+    // D45 oma 遗产清扫：旧 OMA_GATEWAY_* 兼容读已删（1.1.0 窗口已过）。
+    let env_url = read_env_nonempty("HST_GATEWAY_URL");
+    let env_key = read_env_nonempty("HST_GATEWAY_KEY");
     if let (Some(u), Some(k)) = (env_url, env_key) {
         return Ok(Gateway {
             base_url: u.trim_end_matches('/').to_string(),

@@ -12,7 +12,7 @@ pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex", "grok", "kimi"];
 pub enum Source {
     Env,
     Path,
-    Oma,
+    Hst,
     Default,
 }
 
@@ -21,7 +21,7 @@ impl Source {
         match self {
             Source::Env => "env",
             Source::Path => "path",
-            Source::Oma => "hst",
+            Source::Hst => "hst",
             Source::Default => "default",
         }
     }
@@ -30,7 +30,7 @@ impl Source {
         match self {
             Source::Env => 0,
             Source::Path => 1,
-            Source::Oma => 2,
+            Source::Hst => 2,
             Source::Default => 3,
         }
     }
@@ -62,22 +62,22 @@ const SPECS: &[Spec] = &[
     Spec {
         name: "claude",
         commands: &["claude"],
-        env_keys: &["OMA_CLAUDE_BIN", "CLAUDE_BIN"],
+        env_keys: &["HST_CLAUDE_BIN", "CLAUDE_BIN"],
     },
     Spec {
         name: "codex",
         commands: &["codex"],
-        env_keys: &["OMA_CODEX_BIN", "CODEX_BIN"],
+        env_keys: &["HST_CODEX_BIN", "CODEX_BIN"],
     },
     Spec {
         name: "grok",
         commands: &["grok"],
-        env_keys: &["OMA_GROK_BIN", "GROK_BIN"],
+        env_keys: &["HST_GROK_BIN", "GROK_BIN"],
     },
     Spec {
         name: "kimi",
         commands: &["kimi", "kimi-code"],
-        env_keys: &["OMA_KIMI_BIN", "KIMI_BIN", "KIMI_CODE_BIN"],
+        env_keys: &["HST_KIMI_BIN", "KIMI_BIN", "KIMI_CODE_BIN"],
     },
 ];
 
@@ -87,7 +87,7 @@ pub struct Probe {
     pub path_dirs: Vec<PathBuf>,
     pub extra_dirs: Vec<PathBuf>,
     /// hst 自管安装（oma 纪元存量布局 `<根>/agents/<name>/<ver>/`，manifest 指路）的精确二进制表。
-    pub oma_files: Vec<(String, PathBuf)>,
+    pub hst_files: Vec<(String, PathBuf)>,
     pub default_files: Vec<(String, PathBuf)>,
     pub probe_version: bool,
 }
@@ -106,16 +106,16 @@ impl Probe {
                 }
             }
         }
-        let mut extra_dirs = split_path_var("OMA_AGENT_PATH");
+        let mut extra_dirs = split_path_var("HST_AGENT_PATH");
         extra_dirs.extend(codex_home_bins());
-        let oma_files = crate::install::hst_home()
+        let hst_files = crate::install::hst_home()
             .map(|h| crate::install::managed_binaries(&h))
             .unwrap_or_default();
         Probe {
             env_bins,
             path_dirs: split_path_var("PATH"),
             extra_dirs,
-            oma_files,
+            hst_files,
             default_files: default_binaries(&home, local.as_deref(), roaming.as_deref()),
             probe_version: true,
         }
@@ -156,13 +156,13 @@ impl Probe {
             }
         }
 
-        for (name, p) in &self.oma_files {
+        for (name, p) in &self.hst_files {
             if name != spec.name {
                 continue;
             }
             if let Some(resolved) = existing_bin(p) {
                 if !already(&found, &resolved) {
-                    found.push((Source::Oma, spec.commands[0].to_string(), resolved));
+                    found.push((Source::Hst, spec.commands[0].to_string(), resolved));
                 }
             }
         }
@@ -250,7 +250,7 @@ pub fn print_reports(reports: &[Report]) {
             None => {
                 missing += 1;
                 println!(
-                    "agent={} status=missing detail=not on PATH, OMA_AGENT_PATH, OMA_*_BIN, hst root, or default locations hint=ark install {}",
+                    "agent={} status=missing detail=not on PATH, HST_AGENT_PATH, HST_*_BIN, hst root, or default locations hint=ark install {}",
                     r.agent, r.agent
                 );
             }
@@ -520,7 +520,7 @@ mod tests {
             env_bins: BTreeMap::new(),
             path_dirs: vec![path_dir],
             extra_dirs: Vec::new(),
-            oma_files: Vec::new(),
+            hst_files: Vec::new(),
             default_files: vec![("claude".into(), def_bin)],
             probe_version: false,
         };
@@ -534,16 +534,16 @@ mod tests {
     fn oma_beats_default_but_not_path() {
         let root = fresh();
         let path_dir = root.join("path");
-        let oma_bin = root.join("hst").join("claude.exe");
+        let hst_bin = root.join("hst").join("claude.exe");
         let def_bin = root.join("default").join("claude.exe");
         touch(&path_dir.join(claude_name()));
-        touch(&oma_bin);
+        touch(&hst_bin);
         touch(&def_bin);
         let probe = Probe {
             env_bins: BTreeMap::new(),
             path_dirs: vec![path_dir],
             extra_dirs: Vec::new(),
-            oma_files: vec![("claude".into(), oma_bin.clone())],
+            hst_files: vec![("claude".into(), hst_bin.clone())],
             default_files: vec![("claude".into(), def_bin.clone())],
             probe_version: false,
         };
@@ -552,11 +552,11 @@ mod tests {
             env_bins: BTreeMap::new(),
             path_dirs: Vec::new(),
             extra_dirs: Vec::new(),
-            oma_files: vec![("claude".into(), oma_bin)],
+            hst_files: vec![("claude".into(), hst_bin)],
             default_files: vec![("claude".into(), def_bin)],
             probe_version: false,
         };
-        assert_eq!(probe.find("claude").unwrap().source, Source::Oma);
+        assert_eq!(probe.find("claude").unwrap().source, Source::Hst);
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -568,12 +568,12 @@ mod tests {
         touch(&path_dir.join(claude_name()));
         touch(&env_bin);
         let mut env_bins = BTreeMap::new();
-        env_bins.insert("OMA_CLAUDE_BIN".into(), env_bin.clone());
+        env_bins.insert("HST_CLAUDE_BIN".into(), env_bin.clone());
         let probe = Probe {
             env_bins,
             path_dirs: vec![path_dir],
             extra_dirs: Vec::new(),
-            oma_files: Vec::new(),
+            hst_files: Vec::new(),
             default_files: Vec::new(),
             probe_version: false,
         };
@@ -592,7 +592,7 @@ mod tests {
             env_bins: BTreeMap::new(),
             path_dirs: Vec::new(),
             extra_dirs: vec![extra],
-            oma_files: Vec::new(),
+            hst_files: Vec::new(),
             default_files: Vec::new(),
             probe_version: false,
         };
@@ -607,7 +607,7 @@ mod tests {
             env_bins: BTreeMap::new(),
             path_dirs: Vec::new(),
             extra_dirs: Vec::new(),
-            oma_files: Vec::new(),
+            hst_files: Vec::new(),
             default_files: Vec::new(),
             probe_version: false,
         };

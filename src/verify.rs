@@ -11,7 +11,7 @@
 //! - hook：临时目录起无头会话，判据只押 SessionStart / UserPromptSubmit
 //!   这类先于模型调用的事件——模型应答失败（无 token、网络错）不影响判
 //!   定，state 文件落盘即 ok。D28 判据隔离：子进程带
-//!   `OHMYAGENTS_STATE_FILE` 指进临时目录（shim 与 oma hook 都认，env 经
+//!   `HST_STATE_FILE` 指进临时目录（shim 与 hst hook 都认，env 经
 //!   agent 进程继承给 hook 子进程）；万一某家不透传 env，回落扫用户级
 //!   `~/.hst/state/` 里本轮窗口内新写的 `<agent>*.json`。注册走
 //!   **真实用户级面**（四家同一形态，即产品面本身）：byte 备份五件配置、
@@ -90,7 +90,7 @@ pub fn run(names: &[String], timeout_secs: u64) -> Result<Vec<AgentOutcome>, Str
     let wanted = wanted_names(names)?;
     let reports = agents::detect();
     let home = crate::install::hst_home()?;
-    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("oma"));
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("hst"));
     let mut outcomes = Vec::new();
     for name in wanted {
         let hit = reports
@@ -304,7 +304,7 @@ fn codex_statusline_key_present(text: &str) -> bool {
 }
 
 /// 纯函数：config.toml 的 `[tui]` 段 `status_line`（单行或多行数组）含
-/// run-state 锚（oma 部署的内置项清单恒含，M045 无外部命令面）。
+/// run-state 锚（hst 部署的内置项清单恒含，M045 无外部命令面）。
 pub fn codex_builtin_statusline_ok(text: &str) -> bool {
     let mut in_tui = false;
     let mut in_list = false;
@@ -341,7 +341,7 @@ fn verify_hook(
     timeout_secs: u64,
 ) -> (LayerVerdict, Option<String>) {
     let tmp = std::env::temp_dir().join(format!(
-        "oma-verify-{agent}-{}-{}",
+        "hst-verify-{agent}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -393,7 +393,7 @@ fn verify_hook_in(
         None
     };
     // 判据隔离：state 落进临时目录（env 经 agent 进程继承给 hook 子进程）。
-    let state_file = tmp.join("oma-verify-state").join(format!("{agent}.json"));
+    let state_file = tmp.join("hst-verify-state").join(format!("{agent}.json"));
     if let Some(dir) = state_file.parent() {
         if let Err(e) = fs::create_dir_all(dir) {
             return fail(format!("state-dir: {e}"));
@@ -407,7 +407,7 @@ fn verify_hook_in(
     let mut child = match Command::new(&argv[0])
         .args(&argv[1..])
         .current_dir(tmp)
-        .env("OHMYAGENTS_STATE_FILE", &state_file)
+        .env("HST_STATE_FILE", &state_file)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -504,7 +504,7 @@ struct UserHooksGuard {
 impl UserHooksGuard {
     fn seed() -> Result<Self, String> {
         let home = verify_real_home()?;
-        let oma = crate::install::hst_home()?;
+        let root = crate::install::hst_home()?;
         let rels = [
             ".claude/settings.json",
             ".codex/hooks.json",
@@ -524,7 +524,7 @@ impl UserHooksGuard {
         let mut report = crate::deploy::DeployReport::default();
         crate::deploy::deploy_user_hooks_with(
             &home,
-            &oma,
+            &root,
             crate::deploy::host_side(),
             &mut report,
         )?;

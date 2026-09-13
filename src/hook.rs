@@ -90,7 +90,7 @@ fn env_nonempty(key: &str) -> Option<String> {
 }
 
 fn project_allows(payload: Option<&Json>) -> bool {
-    let Some(project) = env_nonempty("OHMYAGENTS_PROJECT") else {
+    let Some(project) = env_nonempty("HST_PROJECT") else {
         return true;
     };
     let Some(v) = payload else {
@@ -143,7 +143,7 @@ pub struct HookOutcome {
     pub guard: Option<crate::secretguard::GuardVerdict>,
 }
 
-/// Hook entry: always exit-path friendly. `OHMYAGENTS_STATE_FILE` 覆盖互斥
+/// Hook entry: always exit-path friendly. `HST_STATE_FILE` 覆盖互斥
 /// 单写（verify 与测试）；缺省走用户级 session 分键通道（D28）：写
 /// `~/.hst/state/<agent>.json`（agent 最新）加 `<agent>-<session>.json`
 /// （session 键，状态栏按当前会话直读；session 取 payload session_id /
@@ -199,7 +199,7 @@ pub(crate) fn run_with_payload(
     if !project_allows(payload.as_ref()) {
         return Ok(HookOutcome::default());
     }
-    let agent = env_nonempty("OHMYAGENTS_AGENT")
+    let agent = env_nonempty("HST_AGENT")
         .or_else(|| agent_arg.map(str::to_string))
         .unwrap_or_default();
     let event = if let Some(arg) = event_arg {
@@ -240,7 +240,7 @@ pub(crate) fn run_with_payload(
         "ts": unix_secs(),
     });
     let body = serde_json::to_string(&record).map_err(|e| e.to_string())? + "\n";
-    let wrote = if let Some(file) = env_nonempty("OHMYAGENTS_STATE_FILE").map(PathBuf::from) {
+    let wrote = if let Some(file) = env_nonempty("HST_STATE_FILE").map(PathBuf::from) {
         atomic_write(&file, &body)?;
         Some(file)
     } else if agent.is_empty() {
@@ -311,8 +311,8 @@ mod tests {
     #[test]
     fn run_is_silent_without_env_or_agent() {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        env::remove_var("OHMYAGENTS_STATE_FILE");
-        env::remove_var("OHMYAGENTS_AGENT");
+        env::remove_var("HST_STATE_FILE");
+        env::remove_var("HST_AGENT");
         env::remove_var("HST_ROOT");
         // 无 agent 名即无状态文件可落（event arg 短路 stdin）。
         assert_eq!(run(Some("blocked"), None).unwrap().state_file, None);
@@ -322,13 +322,13 @@ mod tests {
     fn run_writes_blocked() {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir =
-            std::env::temp_dir().join(format!("oma-hook-{}-{}", std::process::id(), unix_secs()));
+            std::env::temp_dir().join(format!("hst-hook-{}-{}", std::process::id(), unix_secs()));
         let file = dir.join("claude.json");
-        env::set_var("OHMYAGENTS_STATE_FILE", &file);
-        env::set_var("OHMYAGENTS_AGENT", "claude");
+        env::set_var("HST_STATE_FILE", &file);
+        env::set_var("HST_AGENT", "claude");
         let wrote = run(Some("PermissionRequest"), None).unwrap();
-        env::remove_var("OHMYAGENTS_STATE_FILE");
-        env::remove_var("OHMYAGENTS_AGENT");
+        env::remove_var("HST_STATE_FILE");
+        env::remove_var("HST_AGENT");
         assert_eq!(wrote.state_file.as_deref(), Some(file.as_path()));
         let v: Json = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
         assert_eq!(v["state"], "blocked");
@@ -341,10 +341,10 @@ mod tests {
         // D28 用户级 session 分键：HST_ROOT 缝注入临时根，双写
         // <agent>.json 加 <agent>-<session>.json；HookOutcome 报最新键。
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        env::remove_var("OHMYAGENTS_STATE_FILE");
-        env::remove_var("OHMYAGENTS_AGENT");
+        env::remove_var("HST_STATE_FILE");
+        env::remove_var("HST_AGENT");
         let oma = std::env::temp_dir().join(format!(
-            "oma-hook-user-{}-{}",
+            "hst-hook-user-{}-{}",
             std::process::id(),
             unix_secs()
         ));
@@ -387,10 +387,10 @@ mod tests {
     #[test]
     fn session_end_removes_keyed_file_and_sweep_clears_stale() {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        env::remove_var("OHMYAGENTS_STATE_FILE");
-        env::remove_var("OHMYAGENTS_AGENT");
+        env::remove_var("HST_STATE_FILE");
+        env::remove_var("HST_AGENT");
         let oma = std::env::temp_dir().join(format!(
-            "oma-hook-gc-{}-{}",
+            "hst-hook-gc-{}-{}",
             std::process::id(),
             unix_secs()
         ));
@@ -451,10 +451,10 @@ mod tests {
     #[test]
     fn guard_blocks_secret_in_pretooluse_command() {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        env::remove_var("OHMYAGENTS_STATE_FILE");
-        env::remove_var("OHMYAGENTS_AGENT");
+        env::remove_var("HST_STATE_FILE");
+        env::remove_var("HST_AGENT");
         let oma = std::env::temp_dir().join(format!(
-            "oma-hook-guard-{}-{}",
+            "hst-hook-guard-{}-{}",
             std::process::id(),
             unix_secs()
         ));

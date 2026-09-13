@@ -5,7 +5,7 @@
 //!   `status_line` 为内置项 ID 数组（Codex 无外部命令面，S016）
 //! 状态栏脚本本体（pwsh）随 hst 释放到 `~/.hst/statusline/`。
 //! 用户定调 2026-09-02：渲染对齐用户 starship 配置风格（目录截断、git 旗标、
-//! 包与工具链版本段、nerdfont 图标、Catppuccin 系 256 色）；oma 段 = 当前
+//! 包与工具链版本段、nerdfont 图标、Catppuccin 系 256 色）；hst 段 = 当前
 //! agent 名 + 实时四态（hook 状态通道 + 会话闸，机读标记见 S025），另探测
 //! agent 宿主 shell（macOS 走 ps 兜底）。
 
@@ -60,10 +60,10 @@ function FmtDur([double]$ms) {
 $parts = [System.Collections.Generic.List[string]]::new()
 "#;
 
-/// COMMON：工作目录与仓库根发现（目录段与 oma 段共用）。段序含 dir 或 oma
+/// COMMON：工作目录与仓库根发现（目录段与 hst 段共用）。段序含 dir 或 hst
 /// 才拼入：rev-parse 是子进程，无人消费时省掉（kimi 300ms 预算，S025）。
 const PS1_COMMON: &str = r#"
-# ── 工作目录与仓库根（oma 段与目录段共用）──
+# ── 工作目录与仓库根（hst 段与目录段共用）──
 $dir = $null
 if ($d.workspace) { $dir = "$($d.workspace.current_dir)" }
 if (-not $dir -or $dir -eq '.') { $dir = "$($d.cwd)" }
@@ -133,16 +133,16 @@ if ($dir) {
 }
 "#;
 
-/// oma 段：当前 agent 名 + 实时四态（hook 状态通道 + 会话闸，机读标记 S025；
-/// D28 用户级 session 分键读序）。
+/// hst 段（D45 更名，原 oma 段）：当前 agent 名 + 实时四态（hook 状态通
+/// 道与会话闸，机读标记 S025；D28 用户级 session 分键读序）。
 const SEG_OMA: &str = r#"
-# ── oma 段：当前 agent 名 + 实时状态（hook 状态通道；机读标记见 S025）──
-# agent 名：oma 会话 env 优先，部署参数次之（每家配置注入自家名字）。
+# ── hst 段：当前 agent 名 + 实时状态（hook 状态通道；机读标记见 S025）──
+# agent 名：hst 会话 env 优先，部署参数次之（每家配置注入自家名字）。
 $agent = if ($env:HST_AGENT) { $env:HST_AGENT } else { $AgentName }
-# 状态读序（D28）：1) OHMYAGENTS_STATE_FILE 覆盖；2) 用户级 session 键
-# ~/.hst/state/<agent>-<session>.json（session 取 payload session_id /
-# sessionId）；3) 用户级 <agent>.json（agent 最新）；4) 项目级旧协议
-# .hst/state/<agent>.json（旧部署端回落 .ohmyagents）。候选按序试，会话闸不符续找。
+# 状态读序（D28，D45 去 oma 纪元旧名）：1) HST_STATE_FILE 覆盖；2) 用户级
+# session 键 ~/.hst/state/<agent>-<session>.json（session 取 payload
+# session_id / sessionId）；3) 用户级 <agent>.json（agent 最新）；4) 项目级
+# 旧协议 .hst/state/<agent>.json。候选按序试，会话闸不符续找。
 $sid = $null
 if ($d) {
     if ($d.session_id) { $sid = "$($d.session_id)" }
@@ -150,8 +150,8 @@ if ($d) {
 }
 $state = $null
 $stateFile = $null
-if ($env:OHMYAGENTS_STATE_FILE) {
-    $stateFile = $env:OHMYAGENTS_STATE_FILE
+if ($env:HST_STATE_FILE) {
+    $stateFile = $env:HST_STATE_FILE
     if (Test-Path $stateFile) {
         try {
             $st = Get-Content -Raw $stateFile | ConvertFrom-Json
@@ -166,9 +166,7 @@ if ($env:OHMYAGENTS_STATE_FILE) {
     if ($hstStateDir) { $cands += (Join-Path $hstStateDir "$agent.json") }
     $base = if ($root) { $root } else { $dir }
     if ($base) {
-        $omaDir = Join-Path $base '.hst'
-        if (-not (Test-Path $omaDir)) { $omaDir = Join-Path $base '.ohmyagents' }
-        $cands += (Join-Path (Join-Path $omaDir 'state') "$agent.json")
+        $cands += (Join-Path (Join-Path (Join-Path $base '.hst') 'state') "$agent.json")
     }
     foreach ($c in $cands) {
         if (-not (Test-Path $c)) { continue }
@@ -191,8 +189,8 @@ $stateColor = switch ($state) {
     'blocked' { '38;5;203' }
     default { '38;5;245' }
 }
-$omaTxt = ApplyFmt (Tmpl 'oma') @{ icon = (Ico 'oma'); agent = $agent; state = $state }
-$parts.Add((Seg $omaTxt $stateColor))
+$hstTxt = ApplyFmt (Tmpl 'hst') @{ icon = (Ico 'hst'); agent = $agent; state = $state }
+$parts.Add((Seg $hstTxt $stateColor))
 "#;
 
 /// model 段：display_name 优先，回退 id。
@@ -611,12 +609,19 @@ fn ps1_tail_multi(last_row: usize) -> String {
     )
 }
 
-/// 段 id 到脚本块查表。未知 id 报错：拼装无法命中段块。
+/// 段 id 到脚本块查表。未知 id 报错：拼装无法命中段块；oma 纪元旧段名
+/// （D45 更名 hst）带改名 CTA。
 fn segment_block(id: &str) -> Result<&'static str, String> {
+    if id == "oma" {
+        return Err(
+            "unknown statusline segment: oma（D45 起段名 oma 更名 hst，请把配置里的 \"oma\" 改为 \"hst\"）"
+                .to_string(),
+        );
+    }
     Ok(match id {
         "shell" => SEG_SHELL,
         "dir" => SEG_DIR,
-        "oma" => SEG_OMA,
+        "hst" => SEG_OMA,
         "model" => SEG_MODEL,
         "context" => SEG_CONTEXT,
         "tools" => SEG_TOOLS,
@@ -635,20 +640,21 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
     })
 }
 
-/// 默认第一行「项目状态」（D43 用户精修五点）：cwd / git 分支（shell 移
-/// 三行）。D18 定制面 `segments` 键缺省回落此序。
-pub(crate) const DEFAULT_SEGMENTS: &[&str] = &["dir", "git"];
-
-/// 默认第二行「agent 状态」（D43）：agent 态 / 模型 / context 百分比加
-/// token 绝对值（`46% [449k/977k]` 形，构成 mix 退位）/ 耗时。`segments2`
-/// 键缺省回落此序。
-pub(crate) const DEFAULT_SEGMENTS2: &[&str] = &["oma", "model", "context", "duration"];
-
-/// 默认第三行「运行时状态」（D43）：shell / tools 计数 / mcp 计数，加包
-/// 版本与工具链段尾巴。`segments3` 键缺省回落此序。
-pub(crate) const DEFAULT_SEGMENTS3: &[&str] = &[
-    "shell", "tools", "mcp", "package", "python", "rust", "node", "zig", "go", "cpp",
+/// 默认第一行「项目状态」（D44 用户四令排版）：shell / cwd / git 分支 /
+/// 包版本与工具链尾巴（环境与项目同线，D18/D42 的 shell 领首惯例回归）。
+/// D18 定制面 `segments` 键缺省回落此序。
+pub(crate) const DEFAULT_SEGMENTS: &[&str] = &[
+    "shell", "dir", "git", "package", "python", "rust", "node", "zig", "go", "cpp",
 ];
+
+/// 默认第二行「agent 状态」（D43 精修、D45 段更名 hst）：agent 态 / 模型
+/// / context 百分比加 token 绝对值（`46% [449k/977k]` 形，构成 mix 退位）
+/// / 耗时。`segments2` 键缺省回落此序。
+pub(crate) const DEFAULT_SEGMENTS2: &[&str] = &["hst", "model", "context", "duration"];
+
+/// 默认第三行（D44 用户令「去掉第三行」）：默认空 = 两行布局；tools /
+/// mcp 计数与 token 用量三段同退默认位，显式写 `segments3` 才有第三行。
+pub(crate) const DEFAULT_SEGMENTS3: &[&str] = &[];
 
 /// 内嵌默认模板（D18）。键 = 段 id；`context-ascii` 是 grok 的结构差异项
 /// （nerd 版带 used/window 括号对，ascii 版只有百分比加 ctx 后缀）。
@@ -656,7 +662,7 @@ pub(crate) const DEFAULT_SEGMENTS3: &[&str] = &[
 const DEFAULT_TEMPLATES: &[(&str, &str)] = &[
     ("shell", "{icon}{name}"),
     ("dir", "{path}"),
-    ("oma", "{icon}{agent}:{state}"),
+    ("hst", "{icon}{agent}:{state}"),
     ("model", "{icon}{model}"),
     ("context", "{icon}{pct}% [{used}/{window}]"),
     ("context-ascii", "{pct}% [{used}/{window}]"),
@@ -678,12 +684,13 @@ const DEFAULT_TEMPLATES: &[(&str, &str)] = &[
     ("cpp", "{icon}{version}"),
 ];
 
-/// 内嵌默认图标（码位与拆段前脚本逐字对齐；oma 机器人宽字形跟两空格）。
+/// 内嵌默认图标（码位与拆段前脚本逐字对齐；hst 机器人宽字形跟两空格，
+/// D45 前键名 oma）。
 /// Grok ASCII 路径图标恒空串（M046）。
 const DEFAULT_ICONS: &[(&str, &str)] = &[
     ("shell-pwsh", "\u{ebc7} "),
     ("shell", "\u{ea85} "),
-    ("oma", "\u{f06a9}  "),
+    ("hst", "\u{f06a9}  "),
     ("model", "\u{2726} "),
     ("context", "\u{f035b} "),
     ("tools", "\u{f0ad} "),
@@ -747,7 +754,7 @@ fn render_cfg_block(cfg: &StatuslineConfig) -> String {
 
 /// 按段序拼装状态栏脚本（D42 三行分组、D43 五点精修）：HEAD 加烘焙定制块
 /// 加（按需）COMMON / CTXPROBE / PROBE 加逐行段块与排间断点加多行尾。
-/// COMMON 在任一行含 dir / oma / mcp 时拼入（rev-parse 与目录消费）；
+/// COMMON 在任一行含 dir / hst / mcp 时拼入（rev-parse 与目录消费）；
 /// CTXPROBE 在含 tools 段、或 context 段且生效模板（nerd 与 ascii 任一）
 /// 显式含 {mix} 时拼入（D43：{mix} 退出缺省模板，纯「百分比加绝对值」
 /// 配置无消费者不白跑 transcript 尾段解析）；PROBE 在含 package 或任一
@@ -768,15 +775,19 @@ pub(crate) fn assemble_statusline_ps1(
             return Err(format!("unknown statusline icon key: {k}"));
         }
     }
+    // D44 空行剔除（默认第三行为空 = 干净两行脚本，不出残余收线）；
+    // 单行 / 多行判定在剔除后做。
+    let rows_owned: Vec<&[&str]> = rows.iter().copied().filter(|r| !r.is_empty()).collect();
+    let rows: &[&[&str]] = &rows_owned;
     // 多行态 = 非 single_line 且至少两行非空；单行态全段并一行。
-    let nonempty_rows = rows.iter().filter(|r| !r.is_empty()).count();
+    let nonempty_rows = rows.len();
     let multi = !cfg.single_line && nonempty_rows >= 2;
     let all: Vec<&str> = rows.iter().flat_map(|r| r.iter().copied()).collect();
     let mut seen = std::collections::HashSet::new();
     let mut out = String::with_capacity(16 * 1024);
     out.push_str(PS1_HEAD);
     out.push_str(&render_cfg_block(cfg));
-    if all.iter().any(|id| matches!(*id, "dir" | "oma" | "mcp")) {
+    if all.iter().any(|id| matches!(*id, "dir" | "hst" | "mcp")) {
         out.push_str(PS1_COMMON);
     }
     // D43 CTXPROBE 门控（codex F1）：tools 计数恒是消费者；{mix} 只有在
@@ -934,13 +945,14 @@ fn parse_config(text: &str) -> Result<StatuslineConfig, String> {
     Ok(cfg)
 }
 
-/// 段序生效值（D42 三行）：三行各自取用户清单或默认序（未知与跨行重复
-/// id 由拼装器拒）。**老配置原样升级语义**（codex D42 评审 F1/H1 两轮收
-/// 口）：用户显式写过 `segments` 而未写任何后续行键时，未写的行**不补默
-/// 认**（D18 老单排与 v1.1.0 双排两种老形态原样升级，行为零漂移；新装
-/// 用户三键全缺省仍得三行默认）；用户写过任一后续行键（segments2 或
-/// segments3）时，未写的行**补默认并去重**（显式段 id 从默认行剔除，防
-/// 跨行重复硬错）。显式写的行不去重（跨行重复仍由拼装器拒）。
+/// 段序生效值（D42 三行、D44 默认两行）：各行取用户清单或默认序（未知与
+/// 跨行重复 id 由拼装器拒，空行由拼装器剔除）。**老配置原样升级语义**
+/// （codex D42 评审 F1/H1 两轮收口）：用户显式写过 `segments` 而未写任何
+/// 后续行键时，未写的行**不补默认**（D18 老单排与 v1.1.0 双排两种老形态
+/// 原样升级，行为零漂移；新装用户键全缺省得两行默认）；用户写过任一后续
+/// 行键（segments2 或 segments3）时，未写的行**补默认并去重**（显式段
+/// id 从默认行剔除，防跨行重复硬错）。显式写的行不去重（跨行重复仍由拼
+/// 装器拒）。
 fn effective_orders(cfg: &StatuslineConfig) -> Result<Vec<Vec<&str>>, String> {
     let rows = [
         (&cfg.segments, DEFAULT_SEGMENTS),
@@ -971,6 +983,7 @@ fn effective_orders(cfg: &StatuslineConfig) -> Result<Vec<Vec<&str>>, String> {
                 .filter(|id| !user_ids.contains(id))
                 .collect(),
         })
+        .filter(|row| !row.is_empty())
         .collect())
 }
 
@@ -1187,42 +1200,45 @@ fn apply_grok_status_line(toml: &mut toml::Value, script_str: &str) -> Result<bo
     Ok(changed)
 }
 
-/// `oma agents statusline --example` 打印的带注释全量示例（存到
+/// `hst statusline --example` 打印的带注释全量示例（存到
 /// `~/.hst/statusline.toml` 生效）。
 pub const EXAMPLE_TOML: &str = r#"# ~/.hst/statusline.toml —— 状态栏用户级定制（D18）
-# 生成时烘焙：oma agents statusline 每次运行读本文件重拼脚本后落盘，
-# 改完本文件重跑一次 oma agents statusline 生效。
+# 生成时烘焙：hst statusline 每次运行读本文件重拼脚本后落盘，
+# 改完本文件重跑一次 hst statusline 生效。
 # 键级缺省回落：没写的键用内嵌默认；坏文件硬错退出 1。
 
-# 段落清单（D43 用户精修五点后的三行定名）：
-# segments = 第一行项目状态（cwd / git 分支）、segments2 = 第二行 agent
-# 状态（agent 态 / 模型 / context 百分比加 token 绝对值 / 耗时）、
-# segments3 = 第三行运行时状态（shell / tools / mcp 加包与工具链尾巴），
-# 段 id 数组即全量（显隐加顺序）。可用段 id：tools / mcp / tokens 三新段。
+# 段落清单（D44 用户四令后的默认两行）：
+# segments = 第一行项目状态（shell / cwd / git 分支 / 包版本与工具链尾巴）、
+# segments2 = 第二行 agent 状态（agent 态 / 模型 / context 百分比加 token
+# 绝对值 / 耗时），段 id 数组即全量（显隐加顺序）。
+# segments3 = 第三行（D44 起默认空 = 无第三行；可用段 id：tools / mcp /
+# tokens 等显式选用才出现，如要看工具与 MCP 计数：
+#   segments3 = ["tools", "mcp"]
+# ）。
 # 例（隐藏 shell 与时长段、git 提到目录前）：
 #   segments = ["dir", "git"]
-#   segments2 = ["oma", "model", "context"]
-#   segments3 = ["tools", "mcp", "package"]
+#   segments2 = ["hst", "model", "context"]
+#   segments3 = []
 # 退单行（kimi / grok 运行时自动并一行；显式退单行用）：
 #   single_line = true
-segments = ["dir", "git"]
-segments2 = ["oma", "model", "context", "duration"]
-segments3 = ["shell", "tools", "mcp", "package", "python", "rust", "node", "zig", "go", "cpp"]
+segments = ["shell", "dir", "git", "package", "python", "rust", "node", "zig", "go", "cpp"]
+segments2 = ["hst", "model", "context", "duration"]
+segments3 = []
 
 # 段内模板（[template]）：每段一条格式串；`<段>-ascii` 是 grok 的 ASCII 形
 #（缺省同用 nerd 模板、图标恒空）。可用占位符：
-#   shell {icon}{name} / dir {path} / oma {icon}{agent}{state}
+#   shell {icon}{name} / dir {path} / hst {icon}{agent}{state}
 #   model {icon}{model} / context {icon}{pct}{used}{window}{mix}（mix = 构成
 #   占比 [sN tN mN]，transcript 可解析时才有）
 #   tools {icon}{count} / mcp {icon}{count} / tokens {icon}{used}{window}
 #   duration {icon}{duration} / git {branch}{flags}
 #   package 与七工具链段（含 ts）{icon}{version}
-# 例（oma 段去图标改方括号态）：
+# 例（hst 段去图标改方括号态）：
 # [template]
-# oma = "{agent}[{state}]"
+# hst = "{agent}[{state}]"
 
-# 图标映射（[icons]）：键级回落；oma 机器人宽字形默认跟两空格。
-# 可用键：shell / shell-pwsh / oma / model / context / tools / mcp / tokens
+# 图标映射（[icons]）：键级回落；hst 机器人宽字形默认跟两空格。
+# 可用键：shell / shell-pwsh / hst / model / context / tools / mcp / tokens
 #         / duration / package / python / rust / node / ts / zig / go / cpp
 # 例：
 # [icons]
@@ -1241,7 +1257,7 @@ segments3 = ["shell", "tools", "mcp", "package", "python", "rust", "node", "zig"
 /// Codex `[tui].status_line` is an ordered list of built-in item IDs
 /// (ohmypwsh S016, openai/codex 0.148+). Unknown strings are silently
 /// skipped, so a command argv (`"command", "pwsh", "-File", ...`) empties
-/// the bar. oma cannot inject a custom script here.
+/// the bar. hst cannot inject a custom script here.
 /// codex 内置项默认集（D40 对齐增强：codex 只有内置项面，无外部命令
 /// statusline（openai/codex#17827/#20244 未实现），可达上限就是富内置项
 /// 清单——源码 status_line_setup.rs 全量约 30 项）。token 细分（used/
@@ -1330,7 +1346,7 @@ mod tests {
 
     /// 独占临时目录（单测内 fs 落盘判据用；用完即删）。
     fn scratch(name: &str) -> PathBuf {
-        let p = std::env::temp_dir().join(format!("oma-sl-{name}-{}", std::process::id()));
+        let p = std::env::temp_dir().join(format!("hst-sl-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
@@ -1341,10 +1357,10 @@ mod tests {
         // 期望值来自 D18 裁定：segments 写下即全量序，键缺省回落默认。
         assert_eq!(parse_config("").unwrap().segments, None);
         assert_eq!(
-            parse_config("segments = [\"oma\", \"git\"]\n")
+            parse_config("segments = [\"hst\", \"git\"]\n")
                 .unwrap()
                 .segments,
-            Some(vec!["oma".to_string(), "git".to_string()])
+            Some(vec!["hst".to_string(), "git".to_string()])
         );
         // segments = [] 是显式空清单（空栏），不回落默认。
         assert_eq!(
@@ -1368,16 +1384,16 @@ mod tests {
         let home = scratch("order");
         std::fs::write(
             home.join("statusline.toml"),
-            "segments = [\"git\", \"oma\"]\nsegments2 = []\nsegments3 = []\n",
+            "segments = [\"git\", \"hst\"]\nsegments2 = []\nsegments3 = []\n",
         )
         .unwrap();
         let p = deploy_script(&home).unwrap();
         let text = std::fs::read_to_string(&p).unwrap();
         let g = text.find("# ── Git：").unwrap();
-        let o = text.find("# ── oma 段").unwrap();
-        assert!(o > g, "git before oma per config");
+        let o = text.find("# ── hst 段").unwrap();
+        assert!(o > g, "git before hst per config");
         assert!(!text.contains("# ── Shell 段"), "shell hidden");
-        assert!(text.contains("rev-parse"), "COMMON in for oma");
+        assert!(text.contains("rev-parse"), "COMMON in for hst");
         assert!(!text.contains("Cargo.toml"), "PROBE gated off");
         let _ = std::fs::remove_dir_all(&home);
     }
@@ -1411,32 +1427,32 @@ mod tests {
 
     #[test]
     fn parse_config_reads_template_and_icons_tables() {
-        let cfg = parse_config("[template]\noma = '[{state}] {agent}'\n\n[icons]\noma = '>'\n\n")
+        let cfg = parse_config("[template]\nhst = '[{state}] {agent}'\n\n[icons]\nhst = '>'\n\n")
             .unwrap();
         assert_eq!(
             cfg.template,
-            vec![("oma".to_string(), "[{state}] {agent}".to_string())]
+            vec![("hst".to_string(), "[{state}] {agent}".to_string())]
         );
-        assert_eq!(cfg.icons, vec![("oma".to_string(), ">".to_string())]);
+        assert_eq!(cfg.icons, vec![("hst".to_string(), ">".to_string())]);
     }
 
     #[test]
     fn dies_parse_config_rejects_non_string_template_or_icon_value() {
-        assert!(parse_config("[template]\noma = 1\n").is_err());
-        assert!(parse_config("[icons]\noma = true\n").is_err());
+        assert!(parse_config("[template]\nhst = 1\n").is_err());
+        assert!(parse_config("[icons]\nhst = true\n").is_err());
         assert!(parse_config("template = \"x\"\n").is_err(), "not a table");
     }
 
     #[test]
     fn cfg_block_merges_user_over_defaults() {
         let cfg = StatuslineConfig {
-            template: vec![("oma".to_string(), "{agent}[{state}]".to_string())],
+            template: vec![("hst".to_string(), "{agent}[{state}]".to_string())],
             icons: vec![("rust".to_string(), "R ".to_string())],
             ..Default::default()
         };
         let block = render_cfg_block(&cfg);
         assert!(
-            block.contains("'oma' = '{agent}[{state}]'"),
+            block.contains("'hst' = '{agent}[{state}]'"),
             "user template wins:\n{block}"
         );
         assert!(block.contains("'rust' = 'R '"), "user icon wins:\n{block}");
@@ -1445,8 +1461,8 @@ mod tests {
             "untouched defaults survive"
         );
         assert!(
-            block.contains("'oma' = '\u{f06a9}  '"),
-            "default oma icon keeps the wide-glyph double space"
+            block.contains("'hst' = '\u{f06a9}  '"),
+            "default hst icon keeps the wide-glyph double space"
         );
     }
 
@@ -1454,7 +1470,7 @@ mod tests {
     fn cfg_values_cannot_escape_single_quote_literals() {
         // 注入判据：用户值内嵌单引号必须加倍，无法越出 ps1 字面量。
         let cfg = StatuslineConfig {
-            template: vec![("oma".to_string(), "a'; Remove-Item x; '".to_string())],
+            template: vec![("hst".to_string(), "a'; Remove-Item x; '".to_string())],
             ..Default::default()
         };
         let block = render_cfg_block(&cfg);
@@ -1497,7 +1513,7 @@ mod tests {
         let home = scratch("tmpl");
         std::fs::write(
             home.join("statusline.toml"),
-            "[template]\noma = '{agent}[{state}]'\n",
+            "[template]\nhst = '{agent}[{state}]'\n",
         )
         .unwrap();
         let p = deploy_script(&home).unwrap();
@@ -1516,7 +1532,7 @@ mod tests {
     }
 
     #[test]
-    fn oma_segment_reads_user_session_keyed_state() {
+    fn hst_segment_reads_user_session_keyed_state() {
         // pwsh 闸门 skip（R004 形态）：无 pwsh 环境不跑行为判据。
         if !pwsh_on_path() {
             return;
@@ -1572,7 +1588,7 @@ mod tests {
             .arg(agent)
             .current_dir(home)
             .env_remove("HST_AGENT")
-            .env_remove("OHMYAGENTS_STATE_FILE");
+            .env_remove("HST_STATE_FILE");
         // PowerShell $HOME：Windows 随 USERPROFILE、Unix 随 HOME（S025）。
         if cfg!(windows) {
             cmd.env("USERPROFILE", home);
@@ -1659,7 +1675,7 @@ mod tests {
 
     #[test]
     fn codex_items_config_overrides_builtin_list() {
-        // 期望值：用户清单原样透传（含未知 id——codex 侧静默跳过，oma 不拦）。
+        // 期望值：用户清单原样透传（含未知 id——codex 侧静默跳过，hst 不拦）。
         let cfg =
             parse_config("[codex]\nitems = [\"current-dir\", \"git-branch\", \"nope\"]\n").unwrap();
         assert_eq!(
@@ -1711,15 +1727,19 @@ mod tests {
         );
         assert!(
             ps1.contains("\u{f06a9}"),
-            "oma segment robot glyph (md-robot, wide: two spaces survive one)"
+            "hst segment robot glyph (md-robot, wide: two spaces survive one)"
         );
         assert!(
             ps1.contains("$nerd = $AgentName -ne 'grok'"),
             "Grok TUI has no Nerd PUA glyphs; script must take the ASCII path (M046)"
         );
         assert!(
-            ps1.contains("Join-Path $base '.hst'") && ps1.contains("Join-Path $base '.ohmyagents'"),
-            "D14: statusline dual-reads .oma then legacy .ohmyagents"
+            ps1.contains("Join-Path $base '.hst'"),
+            "D28: statusline reads project state under .hst (D45 drops legacy dirs)"
+        );
+        assert!(
+            !ps1.contains(".ohmyagents"),
+            "D45 oma sweep: no legacy project state dir in the script"
         );
         assert!(
             ps1.contains("build.zig")
@@ -1748,24 +1768,16 @@ mod tests {
 
     #[test]
     fn assemble_keeps_default_segment_order() {
-        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D43 精修后
-        // 三行：一行项目状态（dir/git），二行 agent 状态（oma/model/
-        // context/duration），三行运行时状态（shell/tools/mcp 加尾巴）；
-        // tokens 段退出默认行（token 绝对值并入 context 括号）。
+        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D44 用户四
+        // 令后的默认两行：一行项目状态（shell/dir/git/包版本与工具链尾
+        // 巴），二行 agent 状态（hst/model/context/duration）；第三行去掉
+        //（tokens、tools、mcp 三段都退出默认位，显式选用才出现）。
         let ps1 = default_statusline_ps1();
         let mut last = 0usize;
         for marker in [
+            "# ── Shell 段",
             "# ── 目录：",
             "# ── Git：",
-            "$slRow1 = ($parts -join ' | ')",
-            "# ── oma 段",
-            "# ── 模型（",
-            "# ── 上下文：",
-            "# ── 会话累计：",
-            "$slRow2 = ($parts -join ' | ')",
-            "# ── Shell 段",
-            "# ── 工具计数：",
-            "# ── MCP 计数：",
             "if ($pkgVer) {",
             "# ── Python 工具链",
             "# ── Rust 工具链",
@@ -1773,6 +1785,11 @@ mod tests {
             "# ── Zig 工具链",
             "# ── Go 工具链",
             "# ── C/C++ 工具链",
+            "$slRow1 = ($parts -join ' | ')",
+            "# ── hst 段",
+            "# ── 模型（",
+            "# ── 上下文：",
+            "# ── 会话累计：",
         ] {
             let at = ps1
                 .find(marker)
@@ -1785,22 +1802,34 @@ mod tests {
             "tokens segment out of default rows since D43"
         );
         assert!(
+            !ps1.contains("# ── 工具计数："),
+            "tools segment out of default rows since D44"
+        );
+        assert!(
+            !ps1.contains("# ── MCP 计数："),
+            "mcp segment out of default rows since D44"
+        );
+        assert!(
+            !ps1.contains("$slRow3"),
+            "empty default row 3 leaves no vestigial split since D44"
+        );
+        assert!(
             ps1.contains("'context' = '{icon}{pct}% [{used}/{window}]'"),
             "D43 context template bakes absolute tokens, not mix"
         );
         assert!(
             ps1.contains("$slRows | ForEach-Object { Write-Output $_ }"),
-            "three-row tail emits each non-empty row"
+            "multi-row tail emits each non-empty row"
         );
     }
 
     #[test]
     fn assemble_reorders_and_drops_segments() {
         let ps1 =
-            assemble_statusline_ps1(&[&["git", "oma"]], &StatuslineConfig::default()).unwrap();
+            assemble_statusline_ps1(&[&["git", "hst"]], &StatuslineConfig::default()).unwrap();
         let g = ps1.find("# ── Git：").unwrap();
-        let o = ps1.find("# ── oma 段").unwrap();
-        assert!(o > g, "git must render before oma in this order");
+        let o = ps1.find("# ── hst 段").unwrap();
+        assert!(o > g, "git must render before hst in this order");
         assert!(!ps1.contains("# ── Shell 段"), "shell dropped");
         assert!(!ps1.contains("# ── Python 工具链"), "python dropped");
         assert!(
@@ -1814,7 +1843,7 @@ mod tests {
         let bare = assemble_statusline_ps1(&[&["model"]], &StatuslineConfig::default()).unwrap();
         assert!(
             !bare.contains("rev-parse"),
-            "COMMON skipped without dir/oma consumers"
+            "COMMON skipped without dir/hst consumers"
         );
         assert!(
             !bare.contains("Cargo.toml"),
@@ -1829,8 +1858,8 @@ mod tests {
         assert!(probe_only.contains("Cargo.toml"), "PROBE in for package");
         assert!(probe_only.contains("if ($pkgVer) {"));
         let common_only =
-            assemble_statusline_ps1(&[&["oma"]], &StatuslineConfig::default()).unwrap();
-        assert!(common_only.contains("rev-parse"), "COMMON in for oma");
+            assemble_statusline_ps1(&[&["hst"]], &StatuslineConfig::default()).unwrap();
+        assert!(common_only.contains("rev-parse"), "COMMON in for hst");
         assert!(!common_only.contains("Cargo.toml"));
         let ctx_only =
             assemble_statusline_ps1(&[&["tools"]], &StatuslineConfig::default()).unwrap();
@@ -1888,55 +1917,40 @@ mod tests {
     }
 
     #[test]
-    fn three_row_layout_renders_three_lines_with_new_segments() {
-        // D43 行为判据（pwsh 闸门）：三行输出（项目状态 / agent 状态 /
-        // 运行时状态）；一行 = 目录与 git（去 shell），二行 = agent 态加
-        // 模型加 context 百分比带 token 绝对值（构成 mix 退位）加耗时，
-        // 三行 = shell 加工具计数与 MCP 计数（token 用量整段退出第三行）。
-        // codex D40 评审 G2 顺带钉 kimi 退化：同配置下 kimi 并一行。
+    fn default_layout_renders_two_lines_and_explicit_third_row_opts_in() {
+        // D44 行为判据（pwsh 闸门）：默认两行——一行项目状态（shell 与
+        // cwd 与 git 与包版本工具链尾巴），二行 agent 状态（agent 态与
+        // 模型与 context 百分比带 token 绝对值（构成 mix 退位）与耗时）；
+        // 第三行去掉（tools 与 mcp 两计数、token 用量三段显式选用才出
+        // 现）。codex D40 评审 G2 顺带钉 kimi 退化：同配置下 kimi 并一行。
         if !pwsh_on_path() {
             return;
         }
-        let home = scratch("threerow");
-        // transcript 夹具：类别与 tool_use 计数的期望来自 CTXPROBE 分类
-        // 规则（system+summary / tool_use+tool_result / 其余文本）。
-        let tp = home.join("session.jsonl");
-        let mut tp_body = String::new();
-        for _ in 0..3 {
-            tp_body.push_str(
-                r#"{"type":"system","content":"system prompt line of some length here"}"#,
-            );
-            tp_body.push('\n');
-        }
-        for _ in 0..2 {
-            tp_body.push_str(r#"{"type":"user","message":{"role":"user","content":"user asks a question of moderate length"}}"#);
-            tp_body.push('\n');
-        }
-        for _ in 0..3 {
-            tp_body.push_str(r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"answer chunk"},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]}}"#);
-            tp_body.push('\n');
-        }
-        tp_body.push_str(r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"ok"}]}}"#);
-        tp_body.push('\n');
-        std::fs::write(&tp, tp_body).unwrap();
+        let home = scratch("tworow");
+        // Cargo.toml 夹具：一行尾巴的确定性判据（包版本段渲染 v9.9.9）。
+        std::fs::write(
+            home.join("Cargo.toml"),
+            "[package]\nname = \"probe-fixture\"\nversion = \"9.9.9\"\n",
+        )
+        .unwrap();
         // cost 295200000 ms 经 FmtDur 恰为 3d10h（用户裁定示例形态）。
-        let stdin = format!(
-            r#"{{"session_id":"d1","transcript_path":{},"context_window":{{"context_window_size":1000000,"used_percentage":20}},"cost":{{"total_duration_ms":295200000}}}}"#,
-            serde_json::to_string(&tp.display().to_string()).unwrap()
-        );
+        let stdin = br#"{"session_id":"d1","context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":295200000}}"#;
         let p = deploy_script(&home).unwrap();
-        let out = run_statusline(&p, "claude", &home, stdin.as_bytes());
+        let out = run_statusline(&p, "claude", &home, stdin);
         let lines: Vec<&str> = out.lines().filter(|l| !l.trim().is_empty()).collect();
-        assert_eq!(lines.len(), 3, "three-row layout: {out}");
-        // 一行项目状态：目录与 git 在场，agent 态与 shell 名不在一行。
-        assert!(!lines[0].trim().is_empty(), "{out}");
+        assert_eq!(lines.len(), 2, "default two-row layout: {out}");
+        // 一行项目状态：包版本尾巴在场，agent 态不在一行。
+        assert!(
+            lines[0].contains("v9.9.9"),
+            "package tail renders in row 1: {out}"
+        );
         assert!(
             !lines[0].contains("claude:"),
             "agent state belongs to row 2: {out}"
         );
         assert!(
-            !lines[0].contains("pwsh") && !lines[0].contains("powershell"),
-            "shell name belongs to row 3: {out}"
+            !lines[0].contains("20% ["),
+            "context belongs to row 2: {out}"
         );
         // 二行 agent 状态：agent 态加耗时；context 段百分比直跟 token
         // 绝对值括号（FmtTok 1024 进位：200000/1024=195k、1000000/1024=977k）。
@@ -1945,23 +1959,13 @@ mod tests {
             lines[1].contains("20% [195k/977k]"),
             "D43 context shows absolute tokens, not mix: {out}"
         );
-        assert!(lines[1].contains("3d10h"), "duration moved to row 2: {out}");
-        // 三行运行时状态：工具计数在场（codex G1 收紧：图标后随空格加
-        // 计数，钉段渲染形而非裸单字符）；token 用量整段退出第三行。
+        assert!(lines[1].contains("3d10h"), "duration stays in row 2: {out}");
         assert!(
-            lines[2].contains(" 3"),
-            "tool count 3 (tool_use events) in row 3: {out}"
-        );
-        assert!(
-            !lines[2].contains("195k/977k"),
-            "token usage out of row 3 since D43: {out}"
-        );
-        assert!(
-            !lines[2].contains("3d10h"),
-            "duration out of row 3 since D43: {out}"
+            !lines[1].contains("v9.9.9"),
+            "package tail stays in row 1: {out}"
         );
         // kimi 退化（codex G2）：同配置并一行，agent 态与 token 绝对值仍可见。
-        let out_kimi = run_statusline(&p, "kimi", &home, stdin.as_bytes());
+        let out_kimi = run_statusline(&p, "kimi", &home, stdin);
         let kimi_lines = out_kimi
             .lines()
             .filter(|l| !l.trim().is_empty())
@@ -1976,6 +1980,45 @@ mod tests {
             "kimi single line keeps agent state and tokens: {out_kimi}"
         );
         let _ = std::fs::remove_dir_all(&home);
+        // 显式选用面（D40 三要素段保留）：segments3 显式带 tools / mcp /
+        // tokens 时第三行回来、三段照常渲染（transcript 夹具 3 次
+        // tool_use；stdin mcp_servers 2 键）。
+        let home = scratch("tworowx");
+        std::fs::write(
+            home.join("statusline.toml"),
+            concat!(
+                "segments = [\"dir\"]\n",
+                "segments2 = [\"hst\", \"context\"]\n",
+                "segments3 = [\"tools\", \"mcp\", \"tokens\"]\n"
+            ),
+        )
+        .unwrap();
+        let tp = home.join("session.jsonl");
+        let mut tp_body = String::new();
+        for _ in 0..3 {
+            tp_body.push_str(
+                r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]}}"#,
+            );
+            tp_body.push('\n');
+        }
+        std::fs::write(&tp, tp_body).unwrap();
+        let stdin = format!(
+            r#"{{"session_id":"d2","transcript_path":{},"mcp_servers":["a","b"],"context_window":{{"context_window_size":1000000,"used_percentage":20}}}}"#,
+            serde_json::to_string(&tp.display().to_string()).unwrap()
+        );
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline(&p, "claude", &home, stdin.as_bytes());
+        let lines: Vec<&str> = out.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(lines.len(), 3, "explicit third row renders: {out}");
+        assert!(
+            lines[2].contains(" 3") && lines[2].contains(" 2"),
+            "explicit tools/mcp counts still render: {out}"
+        );
+        assert!(
+            lines[2].contains("195k/977k"),
+            "explicit tokens segment still renders: {out}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
     }
 
     #[test]
@@ -1987,7 +2030,7 @@ mod tests {
         let home = scratch("sline");
         std::fs::write(
             home.join("statusline.toml"),
-            "segments = [\"oma\"]\nsegments2 = [\"model\"]\nsegments3 = [\"tokens\"]\nsingle_line = true\n",
+            "segments = [\"hst\"]\nsegments2 = [\"model\"]\nsegments3 = [\"tokens\"]\nsingle_line = true\n",
         )
         .unwrap();
         let stdin = br#"{"context_window":{"context_window_size":1024,"used_percentage":50}}"#;
@@ -2014,13 +2057,14 @@ mod tests {
         }
         let real_payload =
             br#"{"context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":51540000}}"#;
-        // 形 1：v1.1.0 双排原样（EXAMPLE_TOML 上一版）——segments3 补默认
-        // 去重（tools 等已在 segments2，剔空；剩无重复段）。
+        // 形 1：v1.1.0 双排原样（EXAMPLE_TOML 上一版，D45 起段名 oma 改
+        // hst，夹具同步）——segments3 补默认去重（tools 等已在 segments2，
+        // 剔空；剩无重复段）。
         let home = scratch("upg1");
         std::fs::write(
             home.join("statusline.toml"),
             concat!(
-                "segments = [\"shell\",\"dir\",\"oma\",\"model\",\"context\",\"git\"]\n",
+                "segments = [\"shell\",\"dir\",\"hst\",\"model\",\"context\",\"git\"]\n",
                 "segments2 = [\"tools\",\"mcp\",\"tokens\",\"duration\",\"package\",\"python\",\"rust\",\"node\",\"zig\",\"go\",\"cpp\"]\n"
             ),
         )
@@ -2038,7 +2082,7 @@ mod tests {
         std::fs::write(
             home.join("statusline.toml"),
             concat!(
-                "segments = [\"shell\",\"dir\",\"oma\",\"model\",\"context\",\"duration\",\"git\",",
+                "segments = [\"shell\",\"dir\",\"hst\",\"model\",\"context\",\"duration\",\"git\",",
                 "\"package\",\"python\",\"rust\",\"node\",\"zig\",\"go\",\"cpp\"]\n"
             ),
         )
@@ -2055,6 +2099,16 @@ mod tests {
             "legacy single-row config stays one line under real payload: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn dies_oma_segment_id_reports_rename_cta() {
+        // D45 oma 遗产清扫：老段名 oma 不再是可用段 id，报错带改名 CTA。
+        let err = assemble_statusline_ps1(&[&["oma"]], &StatuslineConfig::default()).unwrap_err();
+        assert!(
+            err.contains("unknown statusline segment: oma") && err.contains("改为 \"hst\""),
+            "rename CTA present: {err}"
+        );
     }
 
     #[test]

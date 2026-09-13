@@ -839,7 +839,7 @@ mod tests {
 
     fn fresh_dir() -> std::path::PathBuf {
         let p = std::env::temp_dir().join(format!(
-            "oma-yolo-test-{}-{}-{}",
+            "hst-yolo-test-{}-{}-{}",
             std::process::id(),
             unix_millis(),
             NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
