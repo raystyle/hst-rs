@@ -8,9 +8,8 @@
 //! SessionEnd 删本 session 键文件（GC，崩溃残留由 hst hook 侧陈旧清扫）。
 //! `HST_STATE_FILE` 覆盖优先且互斥（单文件语义，verify 与测试用）。
 //! secretguard 由 shim fail-open 委托加 M060a 白名单：PreToolUse /
-//! UserPromptSubmit 时 oma 在位则转发 payload，仅「exit 2 且 stderr 带
-//! `hst secretguard:` 前缀」判定为自判 block 透传 2 并回放原因；oma 故障
-//! 的其余非零（升级期坏二进制、CLI 契约漂移含 clap 用法错的 exit 2）一律
+//! UserPromptSubmit 时 hst 在位则转发 payload，仅「exit 2 且 stderr 带
+//! `hst secretguard:` 前缀」判定为自判 block 透传 2 并回放原因；hst 故障的其余非零（升级期坏二进制、CLI 契约漂移含 clap 用法错的 exit 2）一律
 //! fail-open 放行，不在位同放行（state 已写）——护无痛轮换。
 //! `hst hook` 保留为手动入口与委托目标（含完整 notification 形状解析）。
 //! cmd 形态两级（用户裁 2026-09-10：jq 归 ome 部署，shim 部署前探 PATH）：
@@ -84,8 +83,8 @@ if errorlevel 1 (
 set "ERRF=%TEMP%\hst-guard-%RANDOM%%RANDOM%.err"
 type "%TMPF%" | hst hook status --agent %AGENT% 2>"%ERRF%"
 set "RC=%errorlevel%"
-rem M060a guard 透传白名单：仅「oma 自判 block」（exit 2 且 stderr 带
-rem hst secretguard: 前缀）才透传 2 并回放原因；oma 故障的非零（升级期
+rem M060a guard 透传白名单：仅「hst 自判 block」（exit 2 且 stderr 带
+rem hst secretguard: 前缀）才透传 2 并回放原因；hst 故障的非零（升级期
 rem 坏二进制、CLI 契约漂移含 clap 用法错也是 exit 2）一律 fail-open
 rem 放行，护无痛轮换。
 if not "%RC%"=="2" goto guardpass
@@ -190,8 +189,8 @@ if errorlevel 1 (
 set "ERRF=%TEMP%\hst-guard-%RANDOM%%RANDOM%.err"
 type "%TMPF%" | hst hook status --agent %AGENT% 2>"%ERRF%"
 set "RC=%errorlevel%"
-rem M060a guard 透传白名单：仅「oma 自判 block」（exit 2 且 stderr 带
-rem hst secretguard: 前缀）才透传 2 并回放原因；oma 故障的非零（升级期
+rem M060a guard 透传白名单：仅「hst 自判 block」（exit 2 且 stderr 带
+rem hst secretguard: 前缀）才透传 2 并回放原因；hst 故障的非零（升级期
 rem 坏二进制、CLI 契约漂移含 clap 用法错也是 exit 2）一律 fail-open
 rem 放行，护无痛轮换。
 if not "%RC%"=="2" goto guardpass
@@ -251,8 +250,8 @@ fi
 case "$event" in
   pretooluse|userpromptsubmit)
     if command -v hst >/dev/null 2>&1; then
-      # M060a guard 透传白名单：仅「oma 自判 block」（exit 2 且 stderr 带
-      # hst secretguard: 前缀）才透传 2 并回放原因；oma 故障的非零一律
+      # M060a guard 透传白名单：仅「hst 自判 block」（exit 2 且 stderr 带
+      # hst secretguard: 前缀）才透传 2 并回放原因；hst 故障的非零一律
       # fail-open 放行，护无痛轮换。
       errf="$(mktemp "${TMPDIR:-/tmp}/hst-guard.XXXXXX" 2>/dev/null || printf '%s/hst-guard.%s' "${TMPDIR:-/tmp}" "$$")"
       printf '%s' "$payload" | hst hook status --agent "$agent" 2>"$errf"
@@ -411,7 +410,7 @@ pub fn host_shell() -> &'static str {
 }
 
 /// 部署 shim 文件集到 hst 自管根的 `hooks/`（D28 用户级常驻：
-/// `<oma_home>/hooks/`，调用方传 `install::hst_home()`；测试传临时根）。
+/// `<hst_home>/hooks/`，调用方传 `install::hst_home()`；测试传临时根）。
 /// 三份脚本全侧落齐（跨 OS 共享并存：Windows init 也备好 .sh、Unix init
 /// 也备好 .cmd；+x 只在 Unix 生效）。cmd 主 shim按 jq 探测选形态（D27
 /// 用户裁定：jq 归 ome 部署，部署前探 PATH；缺位回落 findstr 版并 warn）。
@@ -601,7 +600,7 @@ mod tests {
     #[test]
     fn write_if_changed_skips_identical_content() {
         let dir = std::env::temp_dir().join(format!(
-            "oma-shim-{}-{}",
+            "hst-shim-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -619,7 +618,7 @@ mod tests {
     #[test]
     fn deploy_shims_writes_all_three_and_is_idempotent() {
         let dir = std::env::temp_dir().join(format!(
-            "oma-shimdep-{}-{}",
+            "hst-shimdep-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
