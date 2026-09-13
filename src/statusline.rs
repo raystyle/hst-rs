@@ -232,8 +232,10 @@ if ($d.context_window) {
 "#;
 
 /// CTXPROBE（D40）：transcript 尾段解析，一次供 context 构成（{mix}）与
-/// tools 计数两段消费（段序含 context 或 tools 才拼入；kimi 无
-/// transcript_path 时秒过，300ms 预算不伤）。构成按行字符量三分
+/// tools 计数两段消费（拼入门控见 assemble_statusline_ps1；D43 起 {mix}
+/// 退出缺省模板，纯「百分比加绝对值」配置不再拼入本探针，只有 tools 段
+/// 或显式 {mix} 模板才是消费者；kimi 无 transcript_path 时秒过，300ms
+/// 预算不伤）。构成按行字符量三分
 /// （system+summary / tool_use+tool_result / 其余 user+assistant 文本）估
 /// 算占比——transcript 不含真实 token 计量，占比是近似口径（wsl 总台
 /// D40 需求「JSON 不含构成时 transcript 解析」路径）。
@@ -743,11 +745,13 @@ fn render_cfg_block(cfg: &StatuslineConfig) -> String {
     out
 }
 
-/// 按段序拼装状态栏脚本（D42 三行分组）：HEAD 加烘焙定制块加（按需）COMMON /
-/// CTXPROBE / PROBE 加逐行段块与排间断点加多行尾。COMMON 在任一行含
-/// dir / oma / mcp 时拼入（rev-parse 与目录消费）；CTXPROBE 在含
-/// context / tools 时拼入（transcript 解析一次供构成与计数两段）；PROBE
-/// 在含 package 或任一工具链段时拼入。跨行重复段 id、未知段 id、未知模板
+/// 按段序拼装状态栏脚本（D42 三行分组、D43 五点精修）：HEAD 加烘焙定制块
+/// 加（按需）COMMON / CTXPROBE / PROBE 加逐行段块与排间断点加多行尾。
+/// COMMON 在任一行含 dir / oma / mcp 时拼入（rev-parse 与目录消费）；
+/// CTXPROBE 在含 tools 段、或 context 段且生效模板（nerd 与 ascii 任一）
+/// 显式含 {mix} 时拼入（D43：{mix} 退出缺省模板，纯「百分比加绝对值」
+/// 配置无消费者不白跑 transcript 尾段解析）；PROBE 在含 package 或任一
+/// 工具链段时拼入。跨行重复段 id、未知段 id、未知模板
 /// 或图标键报错；`single_line = true` 时全行并一（kimi / grok 运行时也
 /// 自动并一）；空行不出空行；全空产出空栏（用户显式所为）。
 pub(crate) fn assemble_statusline_ps1(
@@ -775,7 +779,24 @@ pub(crate) fn assemble_statusline_ps1(
     if all.iter().any(|id| matches!(*id, "dir" | "oma" | "mcp")) {
         out.push_str(PS1_COMMON);
     }
-    if all.iter().any(|id| matches!(*id, "context" | "tools")) {
+    // D43 CTXPROBE 门控（codex F1）：tools 计数恒是消费者；{mix} 只有在
+    // context 段在场且生效模板显式含它时才消费（缺省模板已不含）。
+    let tmpl_of = |key: &str| {
+        cfg.template
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+            .unwrap_or_else(|| {
+                DEFAULT_TEMPLATES
+                    .iter()
+                    .find(|(dk, _)| *dk == key)
+                    .map(|(_, v)| *v)
+                    .unwrap_or("")
+            })
+    };
+    let mix_used =
+        tmpl_of("context").contains("{mix}") || tmpl_of("context-ascii").contains("{mix}");
+    if all.iter().any(|id| *id == "tools") || (all.iter().any(|id| *id == "context") && mix_used) {
         out.push_str(PS1_CTXPROBE);
     }
     if all.iter().any(|id| {
@@ -1817,6 +1838,26 @@ mod tests {
             ctx_only.contains("CTXPROBE"),
             "CTXPROBE in for tools consumer"
         );
+        // D43（codex F1）：{mix} 退出缺省模板后，context 段单独在场且缺省
+        // 模板 = 无消费者，不拼 CTXPROBE；显式 {mix} 模板才拼。
+        let ctx_default =
+            assemble_statusline_ps1(&[&["context"]], &StatuslineConfig::default()).unwrap();
+        assert!(
+            !ctx_default.contains("CTXPROBE"),
+            "default context template has no mix consumer"
+        );
+        let ctx_mix = assemble_statusline_ps1(
+            &[&["context"]],
+            &StatuslineConfig {
+                template: vec![("context".to_string(), "{icon}{pct}% {mix}".to_string())],
+                ..StatuslineConfig::default()
+            },
+        )
+        .unwrap();
+        assert!(
+            ctx_mix.contains("CTXPROBE"),
+            "explicit {{mix}} template keeps CTXPROBE"
+        );
     }
 
     #[test]
@@ -1905,9 +1946,10 @@ mod tests {
             "D43 context shows absolute tokens, not mix: {out}"
         );
         assert!(lines[1].contains("3d10h"), "duration moved to row 2: {out}");
-        // 三行运行时状态：工具计数在场；token 用量整段退出第三行。
+        // 三行运行时状态：工具计数在场（codex G1 收紧：图标后随空格加
+        // 计数，钉段渲染形而非裸单字符）；token 用量整段退出第三行。
         assert!(
-            lines[2].contains('3'),
+            lines[2].contains(" 3"),
             "tool count 3 (tool_use events) in row 3: {out}"
         );
         assert!(
