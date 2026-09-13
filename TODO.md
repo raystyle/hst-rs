@@ -19,7 +19,8 @@ D31 至 D35 ohmycloud 协调批（2026-09-13 当日闭环归档 P0048，v1.0.0 �
 - [x] D37 verify 状态栏层环境探测（ohmywsl 总台 I3 适配：未部署面与缺 pwsh 转 skip，断链仍 fail；162 单测加 27 集成绿）
 - [x] D38 活体验收环境容错（总台三轮到点：grok/kimi 结果容错版，hook 层 ok 才计入活体断言、不成 skip 带首条 reason；产品 verify 面不动；R004 三.6 修订）
 - [x] D39 Windows hook 注册 sh 兼容形态（第 1 轮 ps1 桥加 M062；第 2 轮幂等漏清扫加 M063；第 3、4 轮 codex review F/G/H 系全收零异议；宿主 v1.0.0 旧二进制复踩双注册后发 v1.0.1 滚 stable）
-- [ ] D40 状态栏双排与三要素：实现与测试全绿，待 codex 评审闸门后发 v1.1.0 滚 stable（wsl 总台 verify G8 复验随新版）
+- [x] D40 状态栏双排与三要素（v1.1.0 已发：tag 424ff92，codex 三轮零异议，镜像双段到货 digest 全等 e8a9effeb3c2，herdr 已知会；wsl 总台 verify G8 复验随新版）
+- [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 

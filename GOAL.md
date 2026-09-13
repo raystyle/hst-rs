@@ -22,6 +22,7 @@
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-13 | **D40 收口加 v1.1.0 发版**：codex 三轮评审（F 系四件含 kimi 首行退化自动单排、G1 LF 归一与 .gitattributes 防复发）零异议；tag v1.1.0 打在 424ff92，CI 绿、镜像双段到货、win digest 三方对账全等（e8a9effeb3c2）、herdr 知会 ohmycloud；G2（kimi/grok 退单排 pwsh 闸门钉）按下批 |
 | 2026-09-13 | **D40 状态栏双排与三要素（wsl 总台三令）**：双排布局（segments/segments2/single_line 三新键，用户裁定分组）加 tools/mcp/tokens 三新段加 context `{mix}` 构成占位（CTXPROBE 共享探针门控拼入）；codex 对齐增强 = 缺省内置项升十二项（token 细分四项），源码取证无外部命令面、三要素不可达（差距说明入 S034/R002）；168 单测加 28 集成绿（六新钉），本机 dogfood 双排实弹；S034 D40 追记；目标随批发 v1.1.0 |
 | 2026-09-13 | **v1.0.1 宿主终验闭环**：宿主装新版重跑 init，settings.json 八事件全收敛单条 ps1 正形态（裸 cmd 零残留），hook 经 sh 终弹 rc=0，宿主回执「hook 形态线全链闭环」。镜像 hst/stable 与 oma/stable 随 tag 到货（win 主资产 digest 三方对账全等 b884da426587）；herdr 知会 ohmycloud（版本加六资产 sha256） |
 | 2026-09-13 | **v1.0.1 发版**（宿主终验驱动：宿主二进制停 v1.0.0 无清扫逻辑，重跑旧 init 又落直路径行双注册，再手清止痛；宿主依赖新版二进制做单条正形态终验）：tag 打在评审零异议的 `157ed99`，CHANGELOG 1.0.1 里程碑收 D37 至 D39 适配批 |
