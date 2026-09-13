@@ -52,3 +52,10 @@
 ## 六态
 
 本篇检索与官方页核对 2026-09-13 落；流行度判断来自检索面（npm 版本滚动、GitHub 仓、对比评测、社区讨论），未做下载量拉表 [记忆: 待复核]。四家多行与 payload 细分字段的实证留追问链后补。
+
+## D40 落地追记（2026-09-13 同日，wsl 总台实弹三令）
+
+- **多行**：claude 官方多行支持确认，D40 双排布局落地（`segments` / `segments2` 两清单加 `single_line` 逃生门），pwsh 脚本跨平台同一份（宿主与 WSL 同构）。kimi / grok 多行渲染仍未实证，逃生门兜底 [假设: 待宿主复验]。
+- **context 构成**：官方 payload 确认只有 used / total 两级，构成走 transcript 解析（`transcript_path` 尾 500 行按行字符量三分估算占比，无真实 token 计量，近似口径已入 R002）[实证: 本机双排渲染实弹，`8%` 加 mix 段]。
+- **MCP / tools 计数**：MCP = stdin `mcp_servers`（claude 官方字段）优先，回落 `~/.claude.json` 加 `.mcp.json` 键数；tools = transcript `tool_use` 计数 [实证: 集成钉 + 本机实弹]。
+- **codex 能力边界（本轮源码取证）**：`status_line_setup.rs` 全量约 30 个内置项（model / run-state / context-used / used-tokens / total-input-tokens / total-output-tokens / context-window-size / git-branch / branch-changes / hostname / thread-title / task-progress 等），**无外部命令面**（openai/codex#17827、#20244 未实现）。可达形态 = 富内置项清单（D40 缺省集已升十二项，token 细分四项承载「token 用量」要素）；不可达 = tools 计数、MCP 计数、context 构成（与三要素的差距说明）[实证: openai/codex 源码 status_line_setup.rs 2026-09-13]。

@@ -209,9 +209,10 @@ if ($model) {
 }
 "#;
 
-/// context 段：已用百分比（已用/窗口），对齐 Codex 语义。
+/// context 段：已用百分比加构成占比（{mix} = transcript 估算的
+/// system/tools/messages 三分段，无 transcript 时空串）。
 const SEG_CONTEXT: &str = r#"
-# ── 上下文：󰍛 N% (已用/窗口)，对齐 Codex 语义 ──
+# ── 上下文：󰍛 N%{mix}（构成 = transcript 估算 s/t/m 三分段占比）──
 if ($d.context_window) {
     $cw = $d.context_window
     $win = [double]$cw.context_window_size
@@ -223,9 +224,115 @@ if ($d.context_window) {
     }
     if ($null -ne $usedPct -and $win -gt 0) {
         $usedTok = [math]::Round($win * $usedPct / 100)
-        $ctxTxt = ApplyFmt (Tmpl 'context') @{ icon = (Ico 'context'); pct = [string]$usedPct; used = (FmtTok $usedTok); window = (FmtTok $win) }
+        $ctxTxt = ApplyFmt (Tmpl 'context') @{ icon = (Ico 'context'); pct = [string]$usedPct; used = (FmtTok $usedTok); window = (FmtTok $win); mix = "$mixTxt" }
         $c = Seg $ctxTxt '38;5;116'
         if ($c) { $parts.Add($c) }
+    }
+}
+"#;
+
+/// CTXPROBE（D40）：transcript 尾段解析，一次供 context 构成（{mix}）与
+/// tools 计数两段消费（段序含 context 或 tools 才拼入；kimi 无
+/// transcript_path 时秒过，300ms 预算不伤）。构成按行字符量三分
+/// （system+summary / tool_use+tool_result / 其余 user+assistant 文本）估
+/// 算占比——transcript 不含真实 token 计量，占比是近似口径（wsl 总台
+/// D40 需求「JSON 不含构成时 transcript 解析」路径）。
+const PS1_CTXPROBE: &str = r#"
+# ── CTXPROBE：transcript 尾段解析（构成占比与工具计数共用）──
+$toolCalls = $null
+$mixTxt = ''
+$tp = if ($d.transcript_path) { "$($d.transcript_path)" } else { $null }
+if ($tp -and (Test-Path $tp)) {
+    $toolCalls = 0
+    [double]$cs = 0; [double]$ct = 0; [double]$cm = 0
+    foreach ($ln in (Get-Content $tp -Tail 500)) {
+        if ([string]::IsNullOrWhiteSpace($ln)) { continue }
+        try { $e = $ln | ConvertFrom-Json } catch { continue }
+        if ($e.type -eq 'system' -or $e.type -eq 'summary') { $cs += $ln.Length; continue }
+        $content = $null
+        if ($e.message -and $e.message.content) { $content = $e.message.content }
+        if ($content -is [string]) { $cm += $ln.Length; continue }
+        if ($content) {
+            $sawTool = $false
+            foreach ($b in @($content)) {
+                if (-not $b -or -not $b.type) { continue }
+                if ($b.type -eq 'tool_use') { $toolCalls++; $sawTool = $true }
+                elseif ($b.type -eq 'tool_result') { $sawTool = $true }
+            }
+            if ($sawTool) { $ct += $ln.Length } else { $cm += $ln.Length }
+        } else { $cm += $ln.Length }
+    }
+    $tot = $cs + $ct + $cm
+    if ($tot -gt 0) {
+        $psx = [int][math]::Round(100 * $cs / $tot)
+        $ptx = [int][math]::Round(100 * $ct / $tot)
+        $mixTxt = ' [s{0} t{1} m{2}]' -f $psx, $ptx, (100 - $psx - $ptx)
+    }
+}
+"#;
+
+/// tools 段：本会话工具调用计数（transcript tool_use 出现次数）。
+const SEG_TOOLS: &str = r#"
+# ── 工具计数： N（本会话 tool_use 次数，无 transcript 省略）──
+if ($null -ne $toolCalls) {
+    $tTxt = ApplyFmt (Tmpl 'tools') @{ icon = (Ico 'tools'); count = [string]$toolCalls }
+    $t = Seg $tTxt '38;5;215'
+    if ($t) { $parts.Add($t) }
+}
+"#;
+
+/// mcp 段：MCP server 计数。取值序：stdin JSON `mcp_servers`（claude 供）>
+/// `~/.claude.json` `mcpServers` 键数 + 项目 `.mcp.json` 键数（用户级加项
+/// 目级合计）；全缺省省略。
+const SEG_MCP: &str = r#"
+# ── MCP 计数：⋕ N（stdin mcp_servers > ~/.claude.json + .mcp.json 键数）──
+$mcpCount = $null
+if ($d.mcp_servers) { $mcpCount = @($d.mcp_servers).Count }
+if (-not $mcpCount) {
+    $slHome = if ($HOME) { $HOME } else { $env:USERPROFILE }
+    if ($slHome) {
+        $cj = Join-Path $slHome '.claude.json'
+        if (Test-Path $cj) {
+            try {
+                $cjv = Get-Content -Raw $cj | ConvertFrom-Json
+                if ($cjv.mcpServers) { $mcpCount = @($cjv.mcpServers.PSObject.Properties).Count }
+            } catch {}
+        }
+    }
+    $mcpJson = if ($dir) { Join-Path $dir '.mcp.json' } else { $null }
+    if ($mcpJson -and (Test-Path $mcpJson)) {
+        try {
+            $mj = Get-Content -Raw $mcpJson | ConvertFrom-Json
+            $n = 0
+            if ($mj.mcpServers) { $n = @($mj.mcpServers.PSObject.Properties).Count }
+            if ($n -gt 0) { if ($mcpCount) { $mcpCount += $n } else { $mcpCount = $n } }
+        } catch {}
+    }
+}
+if ($mcpCount) {
+    $mTxt = ApplyFmt (Tmpl 'mcp') @{ icon = (Ico 'mcp'); count = [string]$mcpCount }
+    $m = Seg $mTxt '38;5;140'
+    if ($m) { $parts.Add($m) }
+}
+"#;
+
+/// tokens 段：token 用量绝对值（已用/窗口；D40 双排布局第二排）。
+const SEG_TOKENS: &str = r#"
+# ── Token 用量：N/M（已用/窗口绝对值）──
+if ($d.context_window) {
+    $cw = $d.context_window
+    $win2 = [double]$cw.context_window_size
+    $usedPct2 = $null
+    if ($null -ne $cw.used_percentage) {
+        $usedPct2 = [math]::Floor([double]$cw.used_percentage)
+    } elseif ($null -ne $cw.remaining_percentage) {
+        $usedPct2 = 100 - [math]::Floor([double]$cw.remaining_percentage)
+    }
+    if ($null -ne $usedPct2 -and $win2 -gt 0) {
+        $usedTok2 = [math]::Round($win2 * $usedPct2 / 100)
+        $kTxt = ApplyFmt (Tmpl 'tokens') @{ icon = (Ico 'tokens'); used = (FmtTok $usedTok2); window = (FmtTok $win2) }
+        $k = Seg $kTxt '38;5;117'
+        if ($k) { $parts.Add($k) }
     }
 }
 "#;
@@ -479,6 +586,13 @@ if ($nerd -and $projKind -eq 'cpp') {
 /// TAIL：单行收口输出。
 const PS1_TAIL: &str = "\nWrite-Output ($parts -join ' | ')\nexit 0\n";
 
+/// 双排断点（D40）：第一排段块后重置收集器，TAIL 输出两行。
+const PS1_ROWSPLIT: &str =
+    "\n$slRow1 = ($parts -join ' | ')\n$parts = [System.Collections.Generic.List[string]]::new()\n";
+
+const PS1_TAIL2: &str =
+    "\n$slRow2 = ($parts -join ' | ')\nWrite-Output $slRow1\nWrite-Output $slRow2\nexit 0\n";
+
 /// 段 id 到脚本块查表。未知 id 报错：拼装无法命中段块。
 fn segment_block(id: &str) -> Result<&'static str, String> {
     Ok(match id {
@@ -487,6 +601,9 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
         "oma" => SEG_OMA,
         "model" => SEG_MODEL,
         "context" => SEG_CONTEXT,
+        "tools" => SEG_TOOLS,
+        "mcp" => SEG_MCP,
+        "tokens" => SEG_TOKENS,
         "duration" => SEG_DURATION,
         "git" => SEG_GIT,
         "package" => SEG_PACKAGE,
@@ -500,10 +617,14 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
     })
 }
 
-/// 默认段序：等于拆段前脚本顺序（D18 定制面 segments 键缺省回落此序）。
-pub(crate) const DEFAULT_SEGMENTS: &[&str] = &[
-    "shell", "dir", "oma", "model", "context", "duration", "git", "package", "python", "rust",
-    "node", "zig", "go", "cpp",
+/// 默认第一排（D40 用户裁定分组）：shell / cwd / agent 态 / 模型 / context
+/// 构成 / git。D18 定制面 `segments` 键缺省回落此序。
+pub(crate) const DEFAULT_SEGMENTS: &[&str] = &["shell", "dir", "oma", "model", "context", "git"];
+
+/// 默认第二排（D40）：工具数 / MCP 数 / token 用量 / 耗时，加包版本与
+/// 工具链段尾巴（沿用拆段前顺序）。`segments2` 键缺省回落此序。
+pub(crate) const DEFAULT_SEGMENTS2: &[&str] = &[
+    "tools", "mcp", "tokens", "duration", "package", "python", "rust", "node", "zig", "go", "cpp",
 ];
 
 /// 内嵌默认模板（D18）。键 = 段 id；`context-ascii` 是 grok 的结构差异项
@@ -514,8 +635,14 @@ const DEFAULT_TEMPLATES: &[(&str, &str)] = &[
     ("dir", "{path}"),
     ("oma", "{icon}{agent}:{state}"),
     ("model", "{icon}{model}"),
-    ("context", "{icon}{pct}% ({used}/{window})"),
-    ("context-ascii", "{pct}% ctx"),
+    ("context", "{icon}{pct}%{mix}"),
+    ("context-ascii", "{pct}% ctx{mix}"),
+    ("tools", "{icon}{count}"),
+    ("tools-ascii", "{count}"),
+    ("mcp", "{icon}{count}"),
+    ("mcp-ascii", "{count}"),
+    ("tokens", "{icon}{used}/{window}"),
+    ("tokens-ascii", "{used}/{window}"),
     ("duration", "{icon}{duration}"),
     ("git", "{branch}{flags}"),
     ("package", "{icon}{version}"),
@@ -536,6 +663,9 @@ const DEFAULT_ICONS: &[(&str, &str)] = &[
     ("oma", "\u{f06a9}  "),
     ("model", "\u{2726} "),
     ("context", "\u{f035b} "),
+    ("tools", "\u{f0ad} "),
+    ("mcp", "\u{f233} "),
+    ("tokens", "\u{f080} "),
     ("duration", "\u{f0150} "),
     ("package", "\u{f03d7} "),
     ("python", "\u{f0320} "),
@@ -592,12 +722,16 @@ fn render_cfg_block(cfg: &StatuslineConfig) -> String {
     out
 }
 
-/// 按段序拼装状态栏脚本：HEAD 加烘焙定制块加（按需）COMMON / PROBE 加段块
-/// 加 TAIL。COMMON 只在段序含 dir / oma 时拼入（rev-parse 子进程无人消费时
-/// 省掉）；PROBE 只在段序含 package 或任一工具链段时拼入。重复段 id、
-/// 未知段 id、未知模板或图标键报错；段序为空产出空栏（用户显式所为）。
+/// 按段序拼装状态栏脚本（D40 双排）：HEAD 加烘焙定制块加（按需）COMMON /
+/// CTXPROBE / PROBE 加第一排段块加（双排时）ROWSPLIT 加第二排段块加 TAIL。
+/// COMMON 在段序（两排合计，下同）含 dir / oma / mcp 时拼入（rev-parse 与
+/// 目录消费）；CTXPROBE 在含 context / tools 时拼入（transcript 解析一次
+/// 供构成与计数两段）；PROBE 在含 package 或任一工具链段时拼入。跨排重复
+/// 段 id、未知段 id、未知模板或图标键报错；`single_line = true` 或第二排
+/// 为空时退单排（TAIL 单行 join）；段序为空产出空栏（用户显式所为）。
 pub(crate) fn assemble_statusline_ps1(
     order: &[&str],
+    order2: &[&str],
     cfg: &StatuslineConfig,
 ) -> Result<String, String> {
     for (k, _) in &cfg.template {
@@ -610,14 +744,19 @@ pub(crate) fn assemble_statusline_ps1(
             return Err(format!("unknown statusline icon key: {k}"));
         }
     }
+    let dual = !cfg.single_line && !order2.is_empty();
+    let all: Vec<&str> = order.iter().chain(order2.iter()).copied().collect();
     let mut seen = std::collections::HashSet::new();
-    let mut out = String::with_capacity(14 * 1024);
+    let mut out = String::with_capacity(16 * 1024);
     out.push_str(PS1_HEAD);
     out.push_str(&render_cfg_block(cfg));
-    if order.iter().any(|id| *id == "dir" || *id == "oma") {
+    if all.iter().any(|id| matches!(*id, "dir" | "oma" | "mcp")) {
         out.push_str(PS1_COMMON);
     }
-    if order.iter().any(|id| {
+    if all.iter().any(|id| matches!(*id, "context" | "tools")) {
+        out.push_str(PS1_CTXPROBE);
+    }
+    if all.iter().any(|id| {
         matches!(
             *id,
             "package" | "python" | "rust" | "node" | "zig" | "go" | "cpp"
@@ -631,23 +770,51 @@ pub(crate) fn assemble_statusline_ps1(
         }
         out.push_str(segment_block(id)?);
     }
-    out.push_str(PS1_TAIL);
+    if dual {
+        out.push_str(PS1_ROWSPLIT);
+        for id in order2 {
+            if !seen.insert(id) {
+                return Err(format!("duplicate statusline segment: {id}"));
+            }
+            out.push_str(segment_block(id)?);
+        }
+        out.push_str(PS1_TAIL2);
+    } else {
+        // 单排退路：第二排段并入同一行（single_line 或 segments2 为空）。
+        for id in order2 {
+            if !seen.insert(id) {
+                return Err(format!("duplicate statusline segment: {id}"));
+            }
+            out.push_str(segment_block(id)?);
+        }
+        out.push_str(PS1_TAIL);
+    }
     Ok(out)
 }
 
-/// 默认脚本：默认段序加全默认定制拼装（静态合法，失败即程序性 bug）。
+/// 默认脚本：默认双排段序加全默认定制拼装（静态合法，失败即程序性 bug）。
 pub(crate) fn default_statusline_ps1() -> String {
-    assemble_statusline_ps1(DEFAULT_SEGMENTS, &StatuslineConfig::default())
-        .expect("default segment order is valid")
+    assemble_statusline_ps1(
+        DEFAULT_SEGMENTS,
+        DEFAULT_SEGMENTS2,
+        &StatuslineConfig::default(),
+    )
+    .expect("default segment order is valid")
 }
 
 /// `~/.hst/statusline.toml` 用户级定制（D18）。键级缺省回落内嵌默认：
 /// 没写的键用默认，写下的键生效；坏文件硬错退出 1。
 #[derive(Debug, Default, PartialEq)]
 pub struct StatuslineConfig {
-    /// `segments`：段 id 数组即全量序（显隐加顺序）；键缺省回落
+    /// `segments`：第一排段 id 数组即全量序（显隐加顺序）；键缺省回落
     /// `DEFAULT_SEGMENTS`。
     pub segments: Option<Vec<String>>,
+    /// `segments2`（D40）：第二排段 id 数组；键缺省回落
+    /// `DEFAULT_SEGMENTS2`，空数组 = 不出第二排。
+    pub segments2: Option<Vec<String>>,
+    /// `single_line`（D40）：退单排开关（两排段并一行；默认 false 双排）。
+    /// kimi / grok 的多行渲染未实证时的逃生门。
+    pub single_line: bool,
     /// `[template]`：段格式串（键 = 段 id；`<段>-ascii` 为 grok 结构差异项）；
     /// 键级回落 `DEFAULT_TEMPLATES`。
     pub template: Vec<(String, String)>,
@@ -685,6 +852,17 @@ fn parse_config(text: &str) -> Result<StatuslineConfig, String> {
         }
         cfg.segments = Some(out);
     }
+    if let Some(segs) = v.get("segments2") {
+        let arr = segs.as_array().ok_or("segments2 必须是段 id 字符串数组")?;
+        let mut out = Vec::with_capacity(arr.len());
+        for s in arr {
+            out.push(s.as_str().ok_or("segments2 元素必须是字符串")?.to_string());
+        }
+        cfg.segments2 = Some(out);
+    }
+    if let Some(sl) = v.get("single_line") {
+        cfg.single_line = sl.as_bool().ok_or("single_line 必须是布尔值")?;
+    }
     for (key, slot) in [("template", &mut cfg.template), ("icons", &mut cfg.icons)] {
         if let Some(t) = v.get(key) {
             let t = t.as_table().ok_or_else(|| format!("{key} 必须是表"))?;
@@ -711,12 +889,18 @@ fn parse_config(text: &str) -> Result<StatuslineConfig, String> {
     Ok(cfg)
 }
 
-/// 段序生效值：用户清单或默认序（未知与重复 id 由拼装器拒）。
-fn effective_order(cfg: &StatuslineConfig) -> Result<Vec<&str>, String> {
-    Ok(match &cfg.segments {
+/// 段序生效值（D40 双排）：两排各自取用户清单或默认序（未知与跨排重复
+/// id 由拼装器拒）。
+fn effective_orders(cfg: &StatuslineConfig) -> Result<(Vec<&str>, Vec<&str>), String> {
+    let row1 = match &cfg.segments {
         Some(segs) => segs.iter().map(String::as_str).collect(),
         None => DEFAULT_SEGMENTS.to_vec(),
-    })
+    };
+    let row2 = match &cfg.segments2 {
+        Some(segs) => segs.iter().map(String::as_str).collect(),
+        None => DEFAULT_SEGMENTS2.to_vec(),
+    };
+    Ok((row1, row2))
 }
 
 pub(crate) fn script_path(home: &Path) -> PathBuf {
@@ -779,10 +963,10 @@ pub fn deploy_script(home: &Path) -> Result<PathBuf, String> {
     }
     if !marker_path(home).exists() {
         let cfg = read_config(home)?;
-        let order = effective_order(&cfg)?;
-        let script = assemble_statusline_ps1(&order, &cfg).map_err(|e| {
+        let (order, order2) = effective_orders(&cfg)?;
+        let script = assemble_statusline_ps1(&order, &order2, &cfg).map_err(|e| {
             // 段清单来自用户配置时，错误带上文件出处才可操作。
-            if cfg.segments.is_some() {
+            if cfg.segments.is_some() || cfg.segments2.is_some() {
                 format!("{}: {e}", config_path(home).display())
             } else {
                 e
@@ -938,32 +1122,42 @@ pub const EXAMPLE_TOML: &str = r#"# ~/.hst/statusline.toml —— 状态栏用�
 # 改完本文件重跑一次 oma agents statusline 生效。
 # 键级缺省回落：没写的键用内嵌默认；坏文件硬错退出 1。
 
-# 段落清单：段 id 数组即全量（显隐加顺序）；缺省 = 内嵌默认 14 段全量序。
-# 可用段 id：shell / dir / oma / model / context / duration / git / package
-#           / python / rust / node / zig / go / cpp
+# 段落清单（D40 双排）：segments = 第一排、segments2 = 第二排，段 id 数组
+# 即全量（显隐加顺序）。缺省第一排 = shell / dir / oma / model / context /
+# git；缺省第二排 = tools / mcp / tokens / duration / package / python /
+# rust / node / zig / go / cpp。可用段 id 加：tools / mcp / tokens。
 # 例（隐藏 shell 与时长段、git 提到目录前）：
-#   segments = ["dir", "git", "oma", "model", "context", "package",
-#               "python", "rust", "node", "zig", "go", "cpp"]
-segments = ["shell", "dir", "oma", "model", "context", "duration", "git", "package", "python", "rust", "node", "zig", "go", "cpp"]
+#   segments = ["dir", "git", "oma", "model", "context"]
+#   segments2 = ["tools", "mcp", "tokens", "package"]
+# 退单排（kimi / grok 等多行渲染未实证的环境）：
+#   single_line = true
+segments = ["shell", "dir", "oma", "model", "context", "git"]
+segments2 = ["tools", "mcp", "tokens", "duration", "package", "python", "rust", "node", "zig", "go", "cpp"]
 
 # 段内模板（[template]）：每段一条格式串；`<段>-ascii` 是 grok 的 ASCII 形
 #（缺省同用 nerd 模板、图标恒空）。可用占位符：
 #   shell {icon}{name} / dir {path} / oma {icon}{agent}{state}
-#   model {icon}{model} / context {icon}{pct}{used}{window} / duration {icon}{duration}
-#   git {branch}{flags} / package 与七工具链段（含 ts）{icon}{version}
+#   model {icon}{model} / context {icon}{pct}{used}{window}{mix}（mix = 构成
+#   占比 [sN tN mN]，transcript 可解析时才有）
+#   tools {icon}{count} / mcp {icon}{count} / tokens {icon}{used}{window}
+#   duration {icon}{duration} / git {branch}{flags}
+#   package 与七工具链段（含 ts）{icon}{version}
 # 例（oma 段去图标改方括号态）：
 # [template]
 # oma = "{agent}[{state}]"
 
 # 图标映射（[icons]）：键级回落；oma 机器人宽字形默认跟两空格。
-# 可用键：shell / shell-pwsh / oma / model / context / duration / package
-#         / python / rust / node / ts / zig / go / cpp
+# 可用键：shell / shell-pwsh / oma / model / context / tools / mcp / tokens
+#         / duration / package / python / rust / node / ts / zig / go / cpp
 # 例：
 # [icons]
 # rust = "R "
 
 # codex 内置项子集（[codex] items）：替换写入 ~/.codex/config.toml 的
 # [tui].status_line 内置项 ID 清单；未知 id codex 侧静默跳过（S016）。
+# codex 只有内置项面（无外部命令 statusline），D40 后缺省集已含 token
+# 细分（used / total-input / total-output / window）；tools 与 MCP 计数、
+# context 构成 codex 能力面不可达。
 # 例（只要分支与目录）：
 # [codex]
 # items = ["current-dir", "git-branch"]
@@ -973,11 +1167,21 @@ segments = ["shell", "dir", "oma", "model", "context", "duration", "git", "packa
 /// (ohmypwsh S016, openai/codex 0.148+). Unknown strings are silently
 /// skipped, so a command argv (`"command", "pwsh", "-File", ...`) empties
 /// the bar. oma cannot inject a custom script here.
+/// codex 内置项默认集（D40 对齐增强：codex 只有内置项面，无外部命令
+/// statusline（openai/codex#17827/#20244 未实现），可达上限就是富内置项
+/// 清单——源码 status_line_setup.rs 全量约 30 项）。token 细分（used/
+/// input/output/window）是 codex 侧对 D40「token 用量」要素的承载；
+/// tools 计数、MCP 计数、context 构成三要素 codex 能力面不可达（差距
+/// 说明见 S034 追记与 R002）。
 const CODEX_STATUS_LINE_ITEMS: &[&str] = &[
     "run-state",
     "model-with-reasoning",
+    "context-used",
     "context-remaining",
     "used-tokens",
+    "total-input-tokens",
+    "total-output-tokens",
+    "context-window-size",
     "permissions",
     "current-dir",
     "git-branch",
@@ -1089,7 +1293,7 @@ mod tests {
         let home = scratch("order");
         std::fs::write(
             home.join("statusline.toml"),
-            "segments = [\"git\", \"oma\"]\n",
+            "segments = [\"git\", \"oma\"]\nsegments2 = []\n",
         )
         .unwrap();
         let p = deploy_script(&home).unwrap();
@@ -1191,13 +1395,13 @@ mod tests {
             template: vec![("nope".to_string(), "x".to_string())],
             ..Default::default()
         };
-        let err = assemble_statusline_ps1(DEFAULT_SEGMENTS, &cfg).unwrap_err();
+        let err = assemble_statusline_ps1(DEFAULT_SEGMENTS, DEFAULT_SEGMENTS2, &cfg).unwrap_err();
         assert!(err.contains("unknown statusline template key"), "{err}");
         let cfg = StatuslineConfig {
             icons: vec![("nope".to_string(), "x".to_string())],
             ..Default::default()
         };
-        let err = assemble_statusline_ps1(DEFAULT_SEGMENTS, &cfg).unwrap_err();
+        let err = assemble_statusline_ps1(DEFAULT_SEGMENTS, DEFAULT_SEGMENTS2, &cfg).unwrap_err();
         assert!(err.contains("unknown statusline icon key"), "{err}");
     }
 
@@ -1461,7 +1665,9 @@ mod tests {
 
     #[test]
     fn assemble_keeps_default_segment_order() {
-        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。
+        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D40 双排：
+        // 第一排 shell/dir/oma/model/context/git，断点后第二排 tools/mcp/
+        // tokens/duration 加包与工具链尾巴。
         let ps1 = default_statusline_ps1();
         let mut last = 0usize;
         for marker in [
@@ -1470,8 +1676,12 @@ mod tests {
             "# ── oma 段",
             "# ── 模型（",
             "# ── 上下文：",
-            "# ── 会话累计：",
             "# ── Git：",
+            "$slRow1 = ($parts -join ' | ')",
+            "# ── 工具计数：",
+            "# ── MCP 计数：",
+            "# ── Token 用量：",
+            "# ── 会话累计：",
             "if ($pkgVer) {",
             "# ── Python 工具链",
             "# ── Rust 工具链",
@@ -1486,21 +1696,27 @@ mod tests {
             assert!(at > last, "{marker} out of order at {at} (prev {last})");
             last = at;
         }
+        assert!(
+            ps1.contains("Write-Output $slRow1"),
+            "two-row tail emits both lines"
+        );
     }
 
     #[test]
     fn assemble_reorders_and_drops_segments() {
-        let ps1 = assemble_statusline_ps1(&["git", "oma"], &StatuslineConfig::default()).unwrap();
+        let ps1 =
+            assemble_statusline_ps1(&["git", "oma"], &[], &StatuslineConfig::default()).unwrap();
         let g = ps1.find("# ── Git：").unwrap();
         let o = ps1.find("# ── oma 段").unwrap();
         assert!(o > g, "git must render before oma in this order");
         assert!(!ps1.contains("# ── Shell 段"), "shell dropped");
         assert!(!ps1.contains("# ── Python 工具链"), "python dropped");
+        assert!(!ps1.contains("$slRow1"), "empty row2 keeps single tail");
     }
 
     #[test]
     fn assemble_gates_common_and_probe_on_consumers() {
-        let bare = assemble_statusline_ps1(&["model"], &StatuslineConfig::default()).unwrap();
+        let bare = assemble_statusline_ps1(&["model"], &[], &StatuslineConfig::default()).unwrap();
         assert!(
             !bare.contains("rev-parse"),
             "COMMON skipped without dir/oma consumers"
@@ -1509,27 +1725,121 @@ mod tests {
             !bare.contains("Cargo.toml"),
             "PROBE skipped without package/toolchain consumers"
         );
+        assert!(
+            !bare.contains("CTXPROBE"),
+            "CTXPROBE skipped without context/tools consumers"
+        );
         let probe_only =
-            assemble_statusline_ps1(&["package"], &StatuslineConfig::default()).unwrap();
+            assemble_statusline_ps1(&["package"], &[], &StatuslineConfig::default()).unwrap();
         assert!(probe_only.contains("Cargo.toml"), "PROBE in for package");
         assert!(probe_only.contains("if ($pkgVer) {"));
-        let common_only = assemble_statusline_ps1(&["oma"], &StatuslineConfig::default()).unwrap();
+        let common_only =
+            assemble_statusline_ps1(&["oma"], &[], &StatuslineConfig::default()).unwrap();
         assert!(common_only.contains("rev-parse"), "COMMON in for oma");
         assert!(!common_only.contains("Cargo.toml"));
+        let ctx_only =
+            assemble_statusline_ps1(&["tools"], &[], &StatuslineConfig::default()).unwrap();
+        assert!(
+            ctx_only.contains("CTXPROBE"),
+            "CTXPROBE in for tools consumer"
+        );
     }
 
     #[test]
     fn dies_assemble_rejects_unknown_segment() {
-        let err =
-            assemble_statusline_ps1(&["model", "nope"], &StatuslineConfig::default()).unwrap_err();
+        let err = assemble_statusline_ps1(&["model", "nope"], &[], &StatuslineConfig::default())
+            .unwrap_err();
         assert!(err.contains("unknown statusline segment"), "{err}");
     }
 
     #[test]
     fn dies_assemble_rejects_duplicate_segment() {
-        let err =
-            assemble_statusline_ps1(&["git", "git"], &StatuslineConfig::default()).unwrap_err();
+        let err = assemble_statusline_ps1(&["git", "git"], &[], &StatuslineConfig::default())
+            .unwrap_err();
         assert!(err.contains("duplicate statusline segment"), "{err}");
+        // D40：跨排重复同拒（同一渲染面出现两次）。
+        let err =
+            assemble_statusline_ps1(&["git"], &["git"], &StatuslineConfig::default()).unwrap_err();
+        assert!(
+            err.contains("duplicate statusline segment"),
+            "cross-row duplicate rejected: {err}"
+        );
+    }
+
+    #[test]
+    fn dual_row_layout_renders_two_lines_with_new_segments() {
+        // D40 行为判据（pwsh 闸门）：双排输出两行；第二排含工具计数、MCP
+        // 计数、token 用量；context 段带构成占比（transcript 夹具：3 次
+        // tool_use 加 system/user/assistant 文本行）。
+        if !pwsh_on_path() {
+            return;
+        }
+        let home = scratch("dualrow");
+        // transcript 夹具：类别与 tool_use 计数的期望来自 CTXPROBE 分类
+        // 规则（system+summary / tool_use+tool_result / 其余文本）。
+        let tp = home.join("session.jsonl");
+        let mut tp_body = String::new();
+        for _ in 0..3 {
+            tp_body.push_str(
+                r#"{"type":"system","content":"system prompt line of some length here"}"#,
+            );
+            tp_body.push('\n');
+        }
+        for _ in 0..2 {
+            tp_body.push_str(r#"{"type":"user","message":{"role":"user","content":"user asks a question of moderate length"}}"#);
+            tp_body.push('\n');
+        }
+        for _ in 0..3 {
+            tp_body.push_str(r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"answer chunk"},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]}}"#);
+            tp_body.push('\n');
+        }
+        tp_body.push_str(r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"ok"}]}}"#);
+        tp_body.push('\n');
+        std::fs::write(&tp, tp_body).unwrap();
+        let stdin = format!(
+            r#"{{"session_id":"d1","transcript_path":{},"context_window":{{"context_window_size":1000000,"used_percentage":20}}}}"#,
+            serde_json::to_string(&tp.display().to_string()).unwrap()
+        );
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline(&p, "claude", &home, stdin.as_bytes());
+        let lines: Vec<&str> = out.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(lines.len(), 2, "two-row layout: {out}");
+        assert!(out.contains("claude:unknown"), "{out}");
+        assert!(out.contains("20%"), "{out}");
+        assert!(
+            out.contains("[s") && out.contains("t") && out.contains("m"),
+            "context mix present: {out}"
+        );
+        assert!(out.contains("3"), "tool count 3 (tool_use events): {out}");
+        // FmtTok 是 1024 进位（200000/1024=195k、1000000/1024=977k）。
+        assert!(out.contains("195k/977k"), "token usage row2: {out}");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn single_line_config_collapses_rows() {
+        // D40 逃生门：single_line = true 时两排并一行（kimi / grok 多行
+        // 渲染未实证的环境用）。
+        if !pwsh_on_path() {
+            return;
+        }
+        let home = scratch("sline");
+        std::fs::write(
+            home.join("statusline.toml"),
+            "segments = [\"oma\"]\nsegments2 = [\"tokens\"]\nsingle_line = true\n",
+        )
+        .unwrap();
+        let stdin = br#"{"context_window":{"context_window_size":1024,"used_percentage":50}}"#;
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline(&p, "claude", &home, stdin);
+        assert!(out.contains("claude:unknown"), "{out}");
+        assert!(out.contains("512/1k"), "{out}");
+        assert_eq!(
+            out.lines().filter(|l| !l.trim().is_empty()).count(),
+            1,
+            "single line output: {out}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
     }
 
     #[test]
