@@ -1013,6 +1013,88 @@ fn verify_live_headless_acceptance_for_installed_agents() {
 }
 
 #[test]
+fn deployed_state_shim_roundtrips_stdin_payload() {
+    // codex review G2 的最小集成钉：固定 payload（含中文）经管道喂给**落盘
+    // 的**宿主载体 shim（Windows = ps1 面、Unix = sh 面），断言 state JSON
+    // 的 event / state / session 与输入一致——唯一能钉住 stdin 读法的一层
+    // （G1 曾在读法回归下空解析假绿）。直管道不经中间 shell（claude 的
+    // spawner 也是直管道形态）。
+    let tmp = std::env::temp_dir().join(format!(
+        "oma-cli-shim-rt-{}-{}",
+        std::process::id(),
+        NEXT_TEST_DIR.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let root = tmp.join("hst-root");
+    std::fs::create_dir_all(&root).unwrap();
+    let state_file = tmp.join("state.json");
+    // 部署 shim：走产品面（hook init 落全套 shim 到 HST_ROOT）。
+    let dep = std::process::Command::new(env!("CARGO_BIN_EXE_hst"))
+        .args(["hook", "init", "--project"])
+        .arg(&tmp)
+        .env("HST_ROOT", &root)
+        .env("HST_USER_HOME", &tmp.join("user"))
+        .output()
+        .expect("hook init");
+    assert!(dep.status.success(), "hook init failed: {:?}", dep.status);
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let payload = "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"rt-中文-42\"}";
+    let mut child = if cfg!(windows) {
+        let ps1 = root
+            .join("hooks")
+            .join("hst-state.ps1")
+            .display()
+            .to_string()
+            .replace('\\', "/");
+        assert!(
+            root.join("hooks").join("hst-state.ps1").is_file(),
+            "shim deployed"
+        );
+        let mut c = Command::new("powershell.exe");
+        c.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &ps1,
+            "claude",
+        ]);
+        c
+    } else {
+        let sh = root.join("hooks").join("hst-state.sh");
+        assert!(sh.is_file(), "shim deployed");
+        let mut c = Command::new("sh");
+        c.arg(&sh).arg("claude");
+        c
+    };
+    let mut child = child
+        .env("OHMYAGENTS_STATE_FILE", &state_file)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn carrier shim");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(payload.as_bytes())
+        .expect("feed payload");
+    let out = child.wait_with_output().expect("wait carrier");
+    assert!(out.status.success(), "carrier rc: {:?}", out.status.code());
+    let text = std::fs::read_to_string(&state_file).expect("state written");
+    let v: serde_json::Value = serde_json::from_str(&text).expect("state json");
+    // event 大小写不敏感比对：PreToolUse / UserPromptSubmit 的 guard 委托
+    // 把 payload 喂给 hst hook status，其自身也写 state 并规范化事件名
+    // （小写，与 STATE_SH 的 tr 同向）；state 与 session 精确比对。
+    let event = v["event"].as_str().unwrap_or("").to_ascii_lowercase();
+    assert_eq!(event, "userpromptsubmit", "{text}");
+    assert_eq!(v["state"].as_str(), Some("working"), "{text}");
+    assert_eq!(v["session"].as_str(), Some("rt-中文-42"), "{text}");
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn json_and_format_are_mutually_exclusive() {
     oma()
         .args(["--json", "--format", "json", "agents"])

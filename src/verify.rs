@@ -698,7 +698,9 @@ fn wait_with_timeout(child: &mut Child, timeout: Duration) -> bool {
     }
 }
 
-/// 纯函数：state 文件 JSON 的 state 字段 ∈ 四态才作数。
+/// 纯函数：state 文件 JSON 的 state 字段 ∈ 四态且 event 非空才作数。
+/// event 空 = shim 没解析到 stdin payload（codex review G2：此前的判据
+/// 盲区，读空也落 unknown-state 文件、verify 照样绿）。
 pub fn parse_state(text: &str) -> Result<String, String> {
     let v: serde_json::Value =
         serde_json::from_str(text).map_err(|e| format!("state json: {e}"))?;
@@ -707,9 +709,19 @@ pub fn parse_state(text: &str) -> Result<String, String> {
         .and_then(|s| s.as_str())
         .ok_or_else(|| "state field missing".to_string())?;
     match state {
-        "idle" | "working" | "blocked" | "unknown" => Ok(state.to_string()),
-        other => Err(format!("unexpected state {other}")),
+        "idle" | "working" | "blocked" | "unknown" => {}
+        other => return Err(format!("unexpected state {other}")),
     }
+    let event = v
+        .get("event")
+        .and_then(|e| e.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if event.is_empty() {
+        return Err("empty event (shim failed to parse stdin payload)".into());
+    }
+    Ok(state.to_string())
 }
 
 #[cfg(test)]
@@ -779,6 +791,9 @@ mod tests {
         assert!(parse_state("{\"state\": \"running\"}").is_err());
         assert!(parse_state("{\"event\": \"stop\"}").is_err());
         assert!(parse_state("not json").is_err());
+        // codex review G2：event 空 = shim 读空 stdin 的空解析产物，不作数。
+        assert!(parse_state("{\"state\": \"unknown\", \"event\": \"\"}").is_err());
+        assert!(parse_state("{\"state\": \"idle\"}").is_err());
     }
 
     #[test]

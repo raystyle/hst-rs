@@ -1586,6 +1586,9 @@ mod tests {
         assert!(!is_ours("cmd.exe /c C:/tools/foreign.exe run"));
         assert!(!is_ours("powershell -File C:/tools/foreign.ps1 run"));
         assert!(!is_ours("cmd.exe /c echo hi"));
+        // F6：外来前缀族（hst- 开头但非 shim）在包裹分支不得误判。
+        assert!(!is_ours("cmd.exe /c C:\\tools\\hst-logger.exe run"));
+        assert!(!is_ours("powershell.exe -File C:/tools/oma-tool.ps1 x"));
     }
 
     #[test]
