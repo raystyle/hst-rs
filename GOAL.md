@@ -22,6 +22,7 @@
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-13 | **D44 加 D45 收口与 v1.1.3 发版加本地清扫**：codex 两轮评审（一轮 F1 R004/R007 文档旧名、F2 shim 注释与 manifest 登记、G1 注释；二轮放行带 shim 落盘件注释残字顺带清零）；tag v1.1.3 打在 26eabaa，CI 绿、六资产纯 hst-*（stub 绝版）、win digest 三方对账全等（501fe13513ca）；本机换装 v1.1.3 重跑 init（shim 四件烘焙 HST_* 新名、两行栏实弹）；本地 oma 残留清零（~/.oma 转发层、cargo bin oma stub、旧 0.6.1 备份）；herdr 回执 ohmycloud（双版 digest、oma/ 段冻结值与收段动作、env 更名面、wsl 消费口径） |
 | 2026-09-13 | **D44 加 D45 与 v1.1.3 方向**：用户六令连发定状态栏两行终态（一行 shell/cwd/git/包版本工具链尾巴、二行 agent 态/模型/context 绝对值/耗时、去第三行）；oma 遗产清扫全落（段 id hst、HST_* env、OMA_* 兼容读删、别名与 stub 资产退役、init 清扫旧名 shim、self update 资产名钉 hst-* 连带根修 D29 以来选 stub 装自己的 bug）；170 单测加 28 集成绿；待 codex 评审后发 v1.1.3 滚 stable 加本地部署面清扫加 omc 回执 |
 | 2026-09-13 | **D43 收口加 v1.1.2 发版**：codex 两轮评审（一轮 F1 CTXPROBE 门控收紧、G1 断言收紧、H1 注释三轻件全收；二轮零新发现放行）；tag v1.1.2 打在 005e2d1，CI 绿、十二资产齐（含最后一批 oma stub 资产）、herdr 知会随 v1.1.3 合并回执 |
 | 2026-09-13 | **D43 状态栏三行精修五点（v1.1.2 方向）**：用户五点裁定（token 用量退出第三行、shell 移三行、耗时移二行、context 段构成 mix 换 token 绝对值 `46% [449k/977k]` 形、一行去 shell 只剩 cwd 加 git）；三组默认段序重排加 context 缺省模板改 `{icon}{pct}% [{used}/{window}]`（`{mix}` 占位与 `tokens` 段 id 保留可显式选用）；169 单测加 28 集成绿（默认序、三行行为判据 3d10h 加绝对值括号、老配置升级含 D43 形断言）；本机 dogfood 实弹三行新形；目标随批发 v1.1.2 滚 stable |

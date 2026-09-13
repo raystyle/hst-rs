@@ -22,9 +22,9 @@ D31 至 D35 ohmycloud 协调批（2026-09-13 当日闭环归档 P0048，v1.0.0 �
 - [x] D40 状态栏双排与三要素（v1.1.0 已发：tag 424ff92，codex 三轮零异议，镜像双段到货 digest 全等 e8a9effeb3c2，herdr 已知会；wsl 总台 verify G8 复验随新版）
 - [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞；D42 三行测试已顺带钉 kimi 并一行，剩 grok）
 - [x] D42 状态栏三行重分组（v1.1.1 已发：tag 3cfd31a，codex 三轮零异议，镜像双段到货 digest 全等 edfd970c8635，herdr 已知会）
-- [ ] D43 状态栏三行精修五点（v1.1.2 已发：tag 005e2d1，codex 两轮零异议，十二资产齐含最后一批 oma stub；镜像 digest 复核随 v1.1.3 合并对账）
-- [ ] D44 状态栏两行终态（实现全落：默认两行重排加空行剔除，显式第三行 opt-in 面保留 D40 三要素覆盖；170 单测加 28 集成绿）
-- [ ] D45 oma 遗产清扫（仓内全落：段 id hst、HST_* env 全链、OMA_* 兼容读删、别名与 oma stub 资产退役、init 清扫旧名 shim、self update 资产名钉 hst-* 根修；待随 v1.1.3 评审发版后：本地部署面清扫加 ~/.oma 旧根清理加 omc 回执说清两面与镜像 oma/ 段收段）
+- [x] D43 状态栏三行精修五点（v1.1.2 已发：tag 005e2d1，codex 两轮零异议，十二资产齐含最后一批 oma stub，win digest 三方全等 4088acf8）
+- [x] D44 状态栏两行终态（v1.1.3 已发：默认两行重排加空行剔除，显式第三行 opt-in 面保留 D40 三要素覆盖）
+- [x] D45 oma 遗产清扫（v1.1.3 已发：tag 26eabaa，codex 两轮放行，六资产纯 hst-*，win digest 三方全等 501fe135；本地 ~/.hst/bin 换装 v1.1.3 重跑 init、~/.oma 转发层与 cargo bin oma stub 已删；herdr 回执 ohmycloud 已发含 oma/ 段冻结值与收段动作）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 
