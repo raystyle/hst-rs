@@ -34,7 +34,7 @@
 - 2026-09-13，D39 宿主实弹（外部协调来函）加本机对照实证。
 - 现象：claude 在 Windows 的 hook 执行 shell 是 POSIX sh 系。注册直路径 `C:/.../hst-state.cmd <agent>` 在 WSL 形 sh 不认盘符（not found，宿主实弹）；`cmd.exe /c` 桥在 Git Bash（MSYS）被参数转换吃掉 `/c`（本机 rc=1 无落盘）；`//c` 转义形在 PowerShell 进交互态。三种前缀没有跨 sh 通吃解。
 - 根因：M059 的「三吃」结论只测了 Git Bash / PowerShell / cmd 三个 shell 名，漏了 WSL 形 sh 这个真消费方形态；MSYS 参数转换（`/c` 被当 POSIX 路径转成盘符路径）与 WSL 的按名 interop（cmd.exe 可按名解析、`C:/` 参数透传）行为相反，任何单一 cmd 桥都无法同时满足两类 sh。
-- 正解：注册用「按名可解析的解释器加参数位 Windows 路径」形：`powershell -NoProfile -ExecutionPolicy Bypass -File C:/.../hst-state.ps1 <agent>`（参数无前导斜杠不触发 MSYS 转换；powershell.exe 在 PATH 与 WSL interop 恒可按名解析；与状态栏的 `pwsh -File` 同构），配套新增 .ps1 版状态 shim（state 落盘**无 BOM**，防 verify 侧 serde_json 解析炸）。Git Bash / PowerShell / cmd 三 shell 实测 rc=0 加 state 落盘。
+- 正解：注册用「按名可解析的解释器加参数位 Windows 路径」形：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:/.../hst-state.ps1 <agent>`（参数无前导斜杠不触发 MSYS 转换；**head 必须带 `.exe`**：WSL interop 不做 PATHEXT 扩展，无扩展名 `powershell` 在 WSL 形 sh 里 `command not found` rc=127、`powershell.exe` rc=0，codex 评审 F1 实测；与状态栏的 `pwsh -File` 同构），配套新增 .ps1 版状态 shim（state 落盘**无 BOM**，防 verify 侧 serde_json 解析炸）。Git Bash / PowerShell / cmd / WSL 四态实测 rc=0 加 state 落盘。
 - 教训：跨 shell 形态矩阵要枚举 sh 的**方言族**（MSYS / WSL interop / 原生 PowerShell / cmd）而不是 shell 名；斜杠开关类参数（`/c`）在 MSYS 与 WSL 的转换方向相反，桥接形态选「无斜杠前缀的解释器 + 路径只出现在参数位」。
 
 ## M063 init 只清自管事件内的陈旧注册，异形态残留跨事件长存

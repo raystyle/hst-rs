@@ -526,17 +526,13 @@ fn push_statusline(
 
 // ===== hook 注册形态（P0027 口径） =====
 
-/// 命令串首 token 解析（剥调用操作符与包裹引号）：`& "D:/x/hst-state.cmd" codex`
-/// 与 `D:/x/hst-state.cmd codex` 都得 `D:/x/hst-state.cmd`。
+/// 命令串程序位解析（剥调用操作符与包裹引号；D39 包裹形态经
+/// `deploy::program_token` 取解释器后的程序位，codex review F2）：
+/// `& "D:/x/hst-state.cmd" codex`、`D:/x/hst-state.cmd codex` 与
+/// `powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:/x/hst-state.ps1 claude`
+/// 都得指向 shim 脚本本体。
 fn command_target(c: &str) -> std::path::PathBuf {
-    let first = c
-        .trim_start()
-        .trim_start_matches('&')
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .trim_matches('"');
-    std::path::PathBuf::from(first)
+    std::path::PathBuf::from(crate::deploy::program_token(c))
 }
 
 /// JSON 形 hook 注册（claude settings、grok ohmyagents-state.json）的 oma
@@ -2062,6 +2058,23 @@ mod tests {
             {"command": "D:/moved-away/.oma/hooks/hst-state.cmd claude"}
         ]}]}});
         assert_eq!(json_hooks_form(Some(&dead)), "shim-dead");
+        // D39 包裹形态（codex review F2）：程序位是 -File 后的 shim 脚本，
+        // 不是解释器路径；真文件判 shim、死链判 shim-dead。
+        let alive_ps1 = dir.join(".oma").join("hooks").join("hst-state.ps1");
+        std::fs::write(&alive_ps1, "# ps1\n").unwrap();
+        let ps1_fwd = alive_ps1.to_string_lossy().replace('\\', "/");
+        let wrapped = json!({"hooks": {"SessionStart": [{"hooks": [
+            {"command": format!(
+                "powershell.exe -NoProfile -ExecutionPolicy Bypass -File {ps1_fwd} claude"
+            )}
+        ]}]}});
+        assert_eq!(json_hooks_form(Some(&wrapped)), "shim");
+        let wrapped_dead = json!({"hooks": {"SessionStart": [{"hooks": [
+            {"command": format!(
+                "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:/gone/hst-state.ps1 claude"
+            )}
+        ]}]}});
+        assert_eq!(json_hooks_form(Some(&wrapped_dead)), "shim-dead");
         let _ = std::fs::remove_dir_all(&dir);
         let bare = json!({"hooks": {"SessionStart": [{"hooks": [{"command": "oma hook --agent claude"}]}]}});
         assert_eq!(json_hooks_form(Some(&bare)), "bare");
