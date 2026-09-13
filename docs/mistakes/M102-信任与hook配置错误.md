@@ -36,3 +36,11 @@
 - 根因：M059 的「三吃」结论只测了 Git Bash / PowerShell / cmd 三个 shell 名，漏了 WSL 形 sh 这个真消费方形态；MSYS 参数转换（`/c` 被当 POSIX 路径转成盘符路径）与 WSL 的按名 interop（cmd.exe 可按名解析、`C:/` 参数透传）行为相反，任何单一 cmd 桥都无法同时满足两类 sh。
 - 正解：注册用「按名可解析的解释器加参数位 Windows 路径」形：`powershell -NoProfile -ExecutionPolicy Bypass -File C:/.../hst-state.ps1 <agent>`（参数无前导斜杠不触发 MSYS 转换；powershell.exe 在 PATH 与 WSL interop 恒可按名解析；与状态栏的 `pwsh -File` 同构），配套新增 .ps1 版状态 shim（state 落盘**无 BOM**，防 verify 侧 serde_json 解析炸）。Git Bash / PowerShell / cmd 三 shell 实测 rc=0 加 state 落盘。
 - 教训：跨 shell 形态矩阵要枚举 sh 的**方言族**（MSYS / WSL interop / 原生 PowerShell / cmd）而不是 shell 名；斜杠开关类参数（`/c`）在 MSYS 与 WSL 的转换方向相反，桥接形态选「无斜杠前缀的解释器 + 路径只出现在参数位」。
+
+## M063 init 只清自管事件内的陈旧注册，异形态残留跨事件长存
+
+- 2026-09-13，D39 第 2 轮（宿主终验回执：手清 8 条）。
+- 现象：D39 换 ps1 正形态后重跑 init，新注册落了但宿主此前手包的 `cmd.exe /c` 行与更早裸 cmd 行不清，每事件双注册并存、坏行持续报错。
+- 根因：两缝叠加。其一，init 的陈旧替换只跑在**自管事件集**内，非管理事件里的 ours 行（历史版本事件集变更或手工救济行）永不被碰；其二，`is_ours` 的解释器头判定用全 token 精确匹配，全路径头（`C:\Windows\System32\cmd.exe /c ...`）与「cmd 对 powershell 分派按头串前缀」都认不出，管理事件内的该形态行也漏清。kimi 面因按全表字节等值清扫天然无此缝。
+- 正解：`is_ours` 头判定改按 stem（剥路径剥 .exe）并按 stem 分派 cmd/powershell 系；新增 `sweep_unmanaged_ours`（claude/grok）与 `sweep_unmanaged_ours_codex`（只看本侧字段，异侧字段是对方 OS 活注册的字节保留语义）在 merge 前清非管理事件里的 ours 行，空组空事件键收尾，外来条目永不碰。
+- 教训：注册形态变更的「换新」要同时回答「旧形态分布在哪里」：不只自管事件集内，还有历史事件、手工行、未被识别的头形态三类漏网；幂等收敛的覆盖面按「谁可能写过 ours 行」枚举而不是按「本轮要写哪些」。

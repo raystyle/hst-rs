@@ -18,7 +18,7 @@ D31 至 D35 ohmycloud 协调批（2026-09-13 当日闭环归档 P0048，v1.0.0 �
 - [x] 归档（P0048、四原语收口、diary）
 - [x] D37 verify 状态栏层环境探测（ohmywsl 总台 I3 适配：未部署面与缺 pwsh 转 skip，断链仍 fail；162 单测加 27 集成绿）
 - [x] D38 活体验收环境容错（总台三轮到点：grok/kimi 结果容错版，hook 层 ok 才计入活体断言、不成 skip 带首条 reason；产品 verify 面不动；R004 三.6 修订）
-- [x] D39 Windows hook 注册 sh 兼容形态（ps1 桥：powershell -File 前缀加新 ps1 shim，三面统一、grok 不动、is_ours 认前缀形、存量幂等覆盖；M062 记档；对端回执 wsl 总台 37 项全绿）
+- [x] D39 Windows hook 注册 sh 兼容形态（第 1 轮 ps1 桥加 M062 记档；第 2 轮宿主终验回执补幂等漏：is_ours 按 stem 认解释器头加非管理事件清扫，M063 记档）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 

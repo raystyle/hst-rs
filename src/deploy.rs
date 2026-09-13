@@ -66,19 +66,19 @@ pub(crate) fn is_ours(command: &str) -> bool {
     // duplicate once the embedded exe path goes stale). D39：Windows 注册是
     // `powershell ... -File <shim> agent` 解释器前缀形（claude 的 hook 执
     // 行 shell 是 POSIX sh 系，直路径 .cmd 在 WSL 形不认盘符、cmd.exe /c
-    // 在 Git Bash 被 MSYS 吃掉，宿主实弹 2026-09-13）：cmd 系取 /c 后一
-    // token、powershell 系取 -File 后一 token，否则自家新形态误判外来、
-    // 重部署追加重复；只认该程序 token（不扫全串，防 `echo hst` 误报）。
+    // 在 Git Bash 被 MSYS 吃掉，宿主实弹 2026-09-13）；解释器头按 stem 认
+    // （含全路径头 `C:\Windows\System32\cmd.exe`，宿主手包实测形态）：
+    // cmd 系取 /c 后一 token、powershell 系取 -File 后一 token，否则自家
+    // 新形态误判外来、重部署追加重复；只认该程序 token（防 `echo hst` 误
+    // 报）。
     let mut tokens = lower.trim_start_matches('&').split_whitespace();
     let head = tokens.next().unwrap_or("");
-    if !matches!(
-        head,
-        "cmd" | "cmd.exe" | "powershell" | "powershell.exe" | "pwsh" | "pwsh.exe"
-    ) {
-        return family_stem(token_stem(head));
+    let head_stem = token_stem(head);
+    if !matches!(head_stem, "cmd" | "powershell" | "pwsh") {
+        return family_stem(head_stem);
     }
     let rest: Vec<&str> = tokens.collect();
-    if head.starts_with("cmd") {
+    if head_stem == "cmd" {
         let start = usize::from(rest.first() == Some(&"/c"));
         return rest
             .get(start)
@@ -201,6 +201,172 @@ fn merge_hook_event(settings: &mut Json, event: &str, our_handler: Json) -> Resu
         changed = true;
     }
     Ok(changed)
+}
+
+/// 全文件清扫异形态 ours 残留（D39 第 2 轮，宿主终验回执 2026-09-13）：
+/// 只在自管事件集内做陈旧替换会漏——非管理事件里的 ours 旧形态行（历史
+/// 版本事件集变更或手工救济行残留）加新不清旧即每事件双注册并存、坏行
+/// 持续报错（宿主手清 8 条实证）。清扫只动 `managed` 之外的**非管理事
+/// 件**：ours 行整弃（该事件已不归本面管）、空组与空事件键收尾；管理事
+/// 件与外来条目永不碰（管理事件由 merge 的陈旧替换与字段保留语义照旧，
+/// 异侧字段按字节保留语义不动）。
+fn sweep_unmanaged_ours(settings: &mut Json, managed: &[&str]) -> bool {
+    let Some(obj) = settings.as_object_mut() else {
+        return false;
+    };
+    let keys: Vec<String> = obj
+        .get("hooks")
+        .and_then(|h| h.as_object())
+        .map(|m| m.keys().cloned().collect())
+        .unwrap_or_default();
+    let mut changed = false;
+    for event in keys {
+        if managed.contains(&event.as_str()) {
+            continue;
+        }
+        let Some(list) = obj
+            .get_mut("hooks")
+            .and_then(|h| h.as_object_mut())
+            .and_then(|m| m.get_mut(&event))
+            .and_then(|v| v.as_array_mut())
+        else {
+            continue;
+        };
+        for group in list.iter_mut() {
+            if let Some(hooks) = group
+                .as_object_mut()
+                .and_then(|g| g.get_mut("hooks"))
+                .and_then(|h| h.as_array_mut())
+            {
+                let before = hooks.len();
+                hooks.retain(|h| {
+                    h.get("command")
+                        .and_then(|c| c.as_str())
+                        .map(|c| !is_ours(c))
+                        .unwrap_or(true)
+                });
+                if hooks.len() != before {
+                    changed = true;
+                }
+            }
+        }
+        let before = list.len();
+        list.retain(|g| {
+            !g.as_object().is_some_and(|g| {
+                g.get("hooks")
+                    .and_then(|h| h.as_array())
+                    .is_some_and(|a| a.is_empty())
+            })
+        });
+        if list.len() != before || list.is_empty() {
+            changed = true;
+        }
+        if list.is_empty() {
+            obj.get_mut("hooks")
+                .and_then(|h| h.as_object_mut())
+                .map(|m| m.remove(&event));
+        }
+    }
+    let hooks_now_empty = obj
+        .get("hooks")
+        .and_then(|h| h.as_object())
+        .map(|m| m.is_empty())
+        .unwrap_or(false);
+    if hooks_now_empty {
+        obj.remove("hooks");
+    }
+    changed
+}
+
+/// codex 版清扫（D39 第 2 轮）：同 `sweep_unmanaged_ours` 但只看本侧字段
+/// 的 ours（异侧字段是对方 OS 的活注册，M042/M044 字段所有权语义，非管
+/// 理事件里本侧 ours 行整弃）。
+fn sweep_unmanaged_ours_codex(settings: &mut Json, managed: &[&str], side: OsSide) -> bool {
+    let key = if side == OsSide::Windows {
+        "commandWindows"
+    } else {
+        "command"
+    };
+    let Some(obj) = settings.as_object_mut() else {
+        return false;
+    };
+    let keys: Vec<String> = obj
+        .get("hooks")
+        .and_then(|h| h.as_object())
+        .map(|m| m.keys().cloned().collect())
+        .unwrap_or_default();
+    let mut changed = false;
+    for event in keys {
+        if managed.contains(&event.as_str()) {
+            continue;
+        }
+        let Some(list) = obj
+            .get_mut("hooks")
+            .and_then(|h| h.as_object_mut())
+            .and_then(|m| m.get_mut(&event))
+            .and_then(|v| v.as_array_mut())
+        else {
+            continue;
+        };
+        for group in list.iter_mut() {
+            if let Some(hooks) = group
+                .as_object_mut()
+                .and_then(|g| g.get_mut("hooks"))
+                .and_then(|h| h.as_array_mut())
+            {
+                let before = hooks.len();
+                hooks.retain(|h| {
+                    h.get(key)
+                        .and_then(|c| c.as_str())
+                        .map(|c| !is_ours(c))
+                        .unwrap_or(true)
+                });
+                if hooks.len() != before {
+                    changed = true;
+                }
+            }
+        }
+        let before = list.len();
+        list.retain(|g| {
+            !g.as_object().is_some_and(|g| {
+                g.get("hooks")
+                    .and_then(|h| h.as_array())
+                    .is_some_and(|a| a.is_empty())
+            })
+        });
+        if list.len() != before || list.is_empty() {
+            changed = true;
+        }
+        if list.is_empty() {
+            obj.get_mut("hooks")
+                .and_then(|h| h.as_object_mut())
+                .map(|m| m.remove(&event));
+        }
+    }
+    let hooks_now_empty = obj
+        .get("hooks")
+        .and_then(|h| h.as_object())
+        .map(|m| m.is_empty())
+        .unwrap_or(false);
+    if hooks_now_empty {
+        obj.remove("hooks");
+    }
+    changed
+}
+
+/// codex 本侧字段的现行命令串（D39 第 2 轮抽出单一来源：sweep 与
+/// codex_handler_value 共用）。
+fn codex_side_command(oma: &Path, side: OsSide) -> String {
+    match side {
+        OsSide::Unix => format!(
+            "\"{}\" codex",
+            oma.join("hooks").join("hst-state.sh").display()
+        ),
+        OsSide::Windows => format!(
+            "powershell -NoProfile -ExecutionPolicy Bypass -File {} codex",
+            crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.ps1"))
+        ),
+    }
 }
 
 /// oma-owned if either per-OS field names us (codex shape).
@@ -418,17 +584,12 @@ fn codex_handler_value(base: &Json, oma: &Path, session_end: bool, side: OsSide)
     // 缀加无引号正斜杠 ps1 路径（D39 sh 兼容形态，与 claude/kimi 面同款；
     // M059 直路径形态在 PS/cmd 成立但 sh 系不认盘符路径）。Unix 用 sh 路径
     // 直引。`command` 为 schema 必填（M055）：无异侧保留值时落 bare 兜底。
+    // 本侧命令串单一来源 codex_side_command（sweep 共用）。
     let foreign = |key: &str| base.get(key).filter(|v| v.is_string()).cloned();
     let mut obj = serde_json::Map::new();
     obj.insert("type".into(), json!("command"));
     if side == OsSide::Unix {
-        obj.insert(
-            "command".into(),
-            json!(format!(
-                "\"{}\" codex",
-                oma.join("hooks").join("hst-state.sh").display()
-            )),
-        );
+        obj.insert("command".into(), json!(codex_side_command(oma, side)));
     } else if let Some(v) = foreign("command") {
         obj.insert("command".into(), v);
     } else {
@@ -441,10 +602,7 @@ fn codex_handler_value(base: &Json, oma: &Path, session_end: bool, side: OsSide)
     } else {
         obj.insert(
             "commandWindows".into(),
-            json!(format!(
-                "powershell -NoProfile -ExecutionPolicy Bypass -File {} codex",
-                crate::pathutil::forward_slash(&oma.join("hooks").join("hst-state.ps1"))
-            )),
+            json!(codex_side_command(oma, side)),
         );
     }
     obj.insert("timeout".into(), json!(if session_end { 3 } else { 10 }));
@@ -567,6 +725,9 @@ fn deploy_claude_user(
     }
     report.form = Some("user");
     let mut changed = false;
+    // D39 第 2 轮：先清非管理事件里的异形态 ours 残留，再并现行（管理事件
+    // 由 merge 的陈旧替换照旧，is_ours 已认全路径解释器头）。
+    changed |= sweep_unmanaged_ours(&mut settings, &events);
     for event in events {
         changed |= merge_hook_event(&mut settings, event, claude_handler(oma, side))?;
     }
@@ -609,6 +770,10 @@ fn deploy_codex_user(
         settings = json!({});
     }
     let mut changed = false;
+    // D39 第 2 轮：先清非管理事件里的异形态 ours 残留（只看本侧字段），
+    // 再并现行（管理事件由 merge 照旧，异侧字段字节保留语义不动）。
+    let managed: Vec<&str> = events.iter().map(|(e, _)| *e).collect();
+    changed |= sweep_unmanaged_ours_codex(&mut settings, &managed, side);
     for (event, session_end) in events {
         changed |= merge_codex_hook_event(&mut settings, event, session_end, side, oma)?;
     }
@@ -730,6 +895,8 @@ fn deploy_grok_user(
         settings = json!({});
     }
     let mut changed = false;
+    // D39 第 2 轮：先清非管理事件里的异形态 ours 残留，再并现行。
+    changed |= sweep_unmanaged_ours(&mut settings, &events);
     for event in events {
         changed |= merge_hook_event(&mut settings, event, grok_handler(oma, side))?;
     }
@@ -1334,9 +1501,124 @@ mod tests {
             "cmd.exe /c C:/Users/ray/.hst/hooks/hst-state.cmd claude"
         ));
         assert!(is_ours("cmd /c C:/x/.oma/hooks/hst-state.cmd codex"));
+        assert!(is_ours(
+            "C:\\Windows\\System32\\cmd.exe /c C:/Users/ray/.hst/hooks/hst-state.cmd claude"
+        ));
+        assert!(is_ours(
+            "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -File C:/x/.hst/hooks/hst-state.ps1 kimi"
+        ));
         assert!(!is_ours("cmd.exe /c C:/tools/foreign.exe run"));
         assert!(!is_ours("powershell -File C:/tools/foreign.ps1 run"));
         assert!(!is_ours("cmd.exe /c echo hi"));
+    }
+
+    #[test]
+    fn sweep_clears_stale_ours_in_unmanaged_events_and_keeps_foreign() {
+        // D39 第 2 轮（宿主终验回执）：手包 cmd.exe /c 行与更早裸 cmd 行在
+        // 非管理事件里残留时，init 全文件清扫弃之（管理事件补回现行单条），
+        // 外来条目永不碰。
+        let user = fresh_dir("sweep");
+        let oma = fresh_dir("sweep-oma");
+        let claude = user.join(".claude").join("settings.json");
+        ensure_parent(&claude).unwrap();
+        let cmd_path = format!(
+            "{}/hooks/hst-state.cmd",
+            crate::pathutil::forward_slash(&oma)
+        );
+        let seed = json!({
+            "hooks": {
+                "SessionStart": [{"matcher": "*", "hooks": [
+                    {"type": "command", "command": format!("cmd.exe /c {cmd_path} claude")},
+                    {"type": "command", "command": "C:\\tools\\keep.sh"},
+                ]}],
+                "PreCompact": [{"matcher": "*", "hooks": [
+                    {"type": "command", "command": format!("{cmd_path} claude")},
+                    {"type": "command", "command": "C:\\tools\\fmt.js"},
+                ]}],
+            }
+        })
+        .to_string();
+        write_text(&claude, &seed).unwrap();
+
+        let mut report = DeployReport::default();
+        deploy_user_hooks_with(&user, &oma, OsSide::Windows, &mut report).unwrap();
+        let v: Json = serde_json::from_str(&fs::read_to_string(&claude).unwrap()).unwrap();
+        // 管理事件：现行单条加外来保留。
+        let ss = ours_in_event(&claude, "SessionStart");
+        assert_eq!(
+            ss.len(),
+            1,
+            "managed event collapses to one current: {ss:?}"
+        );
+        assert!(ss[0].ends_with("/hooks/hst-state.ps1 claude"), "{}", ss[0]);
+        assert!(v["hooks"]["SessionStart"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|g| g["hooks"][0]["command"].as_str() == Some("C:\\tools\\keep.sh")));
+        // 非管理事件：ours 行清光、外来保留。
+        let pre = v["hooks"].get("PreCompact").cloned();
+        let foreign_kept = pre.as_ref().and_then(|p| p.as_array()).is_some_and(|a| {
+            a.iter()
+                .any(|g| g["hooks"][0]["command"].as_str() == Some("C:\\tools\\fmt.js"))
+        });
+        let ours_gone = pre
+            .as_ref()
+            .and_then(|p| p.as_array())
+            .map(|a| {
+                a.iter()
+                    .all(|g| g["hooks"][0]["command"].as_str() != Some(&cmd_path))
+            })
+            .unwrap_or(true);
+        assert!(foreign_kept, "foreign entry in unmanaged event survives");
+        assert!(ours_gone, "stale ours line in unmanaged event swept");
+        let _ = fs::remove_dir_all(&user);
+        let _ = fs::remove_dir_all(&oma);
+    }
+
+    #[test]
+    fn codex_sweep_clears_stale_ours_in_unmanaged_events() {
+        // codex 面：非管理事件里旧形态 commandWindows 行整 handler 弃（本侧
+        // 字段非现行即弃，含其携带的异侧残段）；纯外来 handler 保留。
+        let user = fresh_dir("sweepcx");
+        let oma = fresh_dir("sweepcx-oma");
+        let path = user.join(".codex").join("hooks.json");
+        ensure_parent(&path).unwrap();
+        let cmd = format!(
+            "{}/hooks/hst-state.cmd",
+            crate::pathutil::forward_slash(&oma)
+        );
+        let seed = json!({
+            "hooks": {
+                "PreCompact": [{"matcher": "*", "hooks": [
+                    {"type": "command", "command": "/foreign/tool.sh",
+                     "commandWindows": format!("cmd.exe /c {cmd} codex")},
+                    {"type": "command", "command": "C:\\tools\\keep.js"},
+                ]}],
+            }
+        })
+        .to_string();
+        write_text(&path, &seed).unwrap();
+
+        let mut report = DeployReport::default();
+        deploy_user_hooks_with(&user, &oma, OsSide::Windows, &mut report).unwrap();
+        let v: Json = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        let arr = v["hooks"]["PreCompact"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let cmds: Vec<String> = arr
+            .iter()
+            .flat_map(|g| g["hooks"].as_array().cloned().unwrap_or_default())
+            .filter_map(|h| h.get("command").and_then(|c| c.as_str()).map(String::from))
+            .collect();
+        assert_eq!(
+            cmds,
+            vec!["C:\\tools\\keep.js".to_string()],
+            "stale ours handler fully swept, foreign survives: {cmds:?}"
+        );
+        let _ = fs::remove_dir_all(&user);
+        let _ = fs::remove_dir_all(&oma);
     }
 
     #[test]
