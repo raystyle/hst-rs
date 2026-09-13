@@ -14,7 +14,7 @@
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：D46 状态栏 agent 版本段（v1.1.4）：版本并入 hst 段（`claude 2.1.270:working` 形）、mtime 键控 probe 缓存、codex-version 内置项入缺省集四家覆盖；herdr 右侧 codex review 闸门（设计轮加 diff 轮）达成一致后 tag v1.1.4 滚 stable，回执 ohmycloud，wsl 总台 G8 复验随新版。
+- **锚定的目标**：无（D46 已交付，v1.1.4 发版加镜像到货加 herdr 回执当日闭环；余 wsl 总台 G8 复验为对端动作，回执后 TODO 关账）。
 
 ### 推进时间线
 
@@ -22,6 +22,7 @@
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-13 | **D46 收口加 v1.1.4 发版**：codex 终验轮 G2 至 G4 收口（G2 探针第二步 2>&1 1>$null 恒空回归改单 2>&1 合流加 stderr 正例测试、G3 S025 容错口径改可执行正则形态、G4 PLAN/TODO/GOAL 刷第 2 轮口径）后零异议放行；tag v1.1.4 打在 28d1e41，CI 绿、六资产 digest 三方对账全等（win c3e14ad6 / linux 1066677e / mac e044a0d9）、镜像 hst/stable 到货；本机镜像直装换装 v1.1.4 重跑 statusline 与 doctor 全绿（kimi login warn 属既有环境事实）；herdr 回执 ohmycloud 已发（六资产 sha、S025 连字符形标记与 G3 正则适配口径、codex 内置集十二项变化、wsl G8 复验邀请）；wsl 总台 G8 复验对端进行中 |
 | 2026-09-13 | **D46 第 2 轮两裁与 codex 三轮评审**：用户实弹观察后两裁（版本段连字符形 `claude-2.1.268:working` 替空格形；codex 面去 context-remaining 只留 `Context N% used` 缺省集回十二项）；codex diff 轮 F1 至 F6 收口（e61d66b）后新抓 G1 探针两步取值随 bced707 收口；serde 加 validator 加 toml 选型材料用户递材入 TODO 队列；终验轮对 bced707 进行中，零异议即 tag v1.1.4 |
 | 2026-09-13 | **D46 实现落地与 diff 轮发起**：herdr codex 设计轮 F1 至 F8 全收口（F1/F2 归一化同源根修、F4 定位序对齐、F5 三元组键加软链解析加 7 天兜底、F6 白名单加原子写、F7 verify 与测试 HST_VER_CACHE_DIR 隔离、F8 文档六面）；实弹新坑 pwsh ConvertFrom-Json 日期自动转换吃缓存键，改 ticks 整数串（S034 记档）；codex-version 源码与 v0.154.0 二进制双实证入缺省集十三项（第 1 轮口径，第 2 轮裁去 context-remaining 回十二项）；commit be284dc（174 单测加 28 集成与四文档门禁全绿，dogfood 三面实弹：payload 直用、grok 真探 1.0.30 落缓存、缓存命中）；codex diff 轮已发（bcsm 后台），零异议后 tag v1.1.4 |
 | 2026-09-13 | **D46 立项开工**：用户裁 v1.1.4 方向（状态栏二行 agent 版本段，数据源 stdin version 优先否则 probe 加缓存，发版滚 stable 回执，wsl 总台 G8 复验随新版）；追问链三裁落定（版本并入 hst 段 agent 名后加 S025 标记随批改形、mtime 键控单文件缓存加 5 分钟失败静默窗、codex 面源码取证 CodexVersion 内置项 ID codex-version 入缺省集）；herdr 右侧 codex 设计轮 review 已发（用户令「要让右侧 codex review」），diff 轮随实现后 |
