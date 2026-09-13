@@ -929,7 +929,8 @@ fn effective_orders(cfg: &StatuslineConfig) -> Result<Vec<Vec<&str>>, String> {
     // 老配置形态 = 用户写过 segments 且没写任何后续行键 → 后续缺省行不补
     // （原样单行升级）。新装（segments 也缺省）与写过后续键的配置照常补
     // 默认（去重）。
-    let legacy_single_row = cfg.segments.is_some() && !any_later_row_written;
+    let legacy_single_row =
+        cfg.segments.as_ref().is_some_and(|v| !v.is_empty()) && !any_later_row_written;
     // 用户显式写过的段 id 全集：补默认的行剔除这些 id。
     let user_ids: std::collections::HashSet<&str> = rows
         .iter()
