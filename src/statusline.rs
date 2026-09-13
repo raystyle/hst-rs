@@ -225,15 +225,16 @@ if (-not $ver -and ($agent -match '^(claude|codex|grok|kimi)$')) {
             # 帧裸 spawn，静默窗与三元组键全失效（codex diff 轮 F3），天然
             # 回落旧形。
             if ($needProbe -and $verFile) {
-                # 两步取值（codex G1）：stdout 优先（2>$null 静默 stderr），
-                # 正则未中再单独取 stderr（2>&1 1>$null），不合流——与
-                # agents.rs read_version「stdout 空取 stderr」同口径，stderr
-                # 噪声里的版本样串不抢在 stdout 之前（多一次 spawn 只在缓存
-                # miss 路径，可接受）。
+                # 两步取值（codex G1/G2）：stdout 优先（2>$null 静默 stderr），
+                # 正则未中再合流取 stderr（此步只在 stdout 无版本样串时走，
+                # 不存在噪声抢跑；注意不能写 2>&1 1>$null——重定向按出现次
+                # 序处理，1>$null 会把并流后的整条丢空、恒得空串，codex 实
+                # 弹证伪过）——与 agents.rs read_version「stdout 空取 stderr」
+                # 同口径（多一次 spawn 只在缓存 miss 路径，可接受）。
                 $vout = ''
                 try { $vout = (& $binPath --version 2>$null | Out-String).Trim() } catch { $vout = '' }
                 if ($vout -notmatch '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') {
-                    try { $vout = (& $binPath --version 2>&1 1>$null | Out-String).Trim() } catch { $vout = '' }
+                    try { $vout = (& $binPath --version 2>&1 | Out-String).Trim() } catch { $vout = '' }
                 }
                 if ($vout -match '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') { $ver = $Matches[1] } else { $ver = $null }
                 try {
@@ -1860,6 +1861,45 @@ mod tests {
         assert!(
             out2.contains("claude-3.2.1:unknown"),
             "cache hit path renders identically: {out2}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn d46_probe_falls_back_to_stderr_for_version() {
+        // codex G2：stdout 无版本样串时第二步合流取 stderr（read_version
+        // 同口径）。假件只往 stderr 打版本（Windows cmd 1>&2、Unix >&2），
+        // 判据 = 仍渲染带版本标记。
+        if !pwsh_on_path() {
+            return;
+        }
+        let home = scratch("d46stderr");
+        let fake_dir = home.join("fakebin");
+        std::fs::create_dir_all(&fake_dir).unwrap();
+        let fake = if cfg!(windows) {
+            let f = fake_dir.join("claude.cmd");
+            std::fs::write(&f, "@echo claude 7.7.7 1>&2\r\n").unwrap();
+            f
+        } else {
+            let f = fake_dir.join("claude");
+            std::fs::write(&f, "#!/bin/sh\necho 'claude 7.7.7' >&2\n").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+            f
+        };
+        let cache = home.join("vcache");
+        let envs: Vec<(&str, std::ffi::OsString)> = vec![
+            ("HST_CLAUDE_BIN", fake.as_os_str().to_os_string()),
+            ("HST_VER_CACHE_DIR", cache.as_os_str().to_os_string()),
+        ];
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
+        assert!(
+            out.contains("claude-7.7.7:unknown"),
+            "stderr-only version is captured by the fallback step: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
     }
