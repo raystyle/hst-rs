@@ -136,9 +136,104 @@ if ($dir) {
 /// hst 段（D45 更名，原 oma 段）：当前 agent 名 + 实时四态（hook 状态通
 /// 道与会话闸，机读标记 S025；D28 用户级 session 分键读序）。
 const SEG_OMA: &str = r#"
-# ── hst 段：当前 agent 名 + 实时状态（hook 状态通道；机读标记见 S025）──
+# ── hst 段：当前 agent 名 + 版本（D46）+ 实时状态（hook 状态通道；机读
+# 标记见 S025，D46 起可带版本形 `claude 2.1.270:working`）──
 # agent 名：hst 会话 env 优先，部署参数次之（每家配置注入自家名字）。
 $agent = if ($env:HST_AGENT) { $env:HST_AGENT } else { $AgentName }
+# 版本两级（D46，codex 设计轮 F1/F2/F4/F5/F6 收口）：payload version 字
+# 段优先（claude/kimi/grok stdin 契约都带自家版本，kimi/grok 二进制实
+# 证见 S034 D46 追记），取值与 probe 输出走同一条归一化（`数字.数字`
+# 起头 token；非数字如 nightly 不显示，回落旧形——显示面与 verify 判据
+# 同源，S025）。否则本地探：定位序对齐 agents 探测（HST_<AGENT>_BIN 显
+# 式钉优先，其次 HST_AGENT_PATH 目录，最后 PATH；hst 自管根与默认位不
+# 参与，差异记档 R002）；探针只对四家白名单放行（spawn 面与缓存文件名
+# 受控）；键 = (终目标路径, mtime, size) 三元组（软链解析一层 LinkTarget；
+# 壳 shim 与保留 mtime 的升级由 7 天兜底重探覆盖）；缓存按 agent 单文
+# 件、临时件加改名原子落盘，读失败按 miss；探测失败记空值加 5 分钟静
+# 默窗（防每帧重试 spawn）。HST_VER_CACHE_DIR 覆盖缓存目录（verify 与
+# 测试隔离通道，对齐 HST_STATE_FILE 先例）。$agent 本体保持纯名（下方
+# state 文件定位吃它），版本只进 $agentDisp 渲染值。
+$ver = $null
+if ($d.version) {
+    $pv = "$($d.version)"
+    if ($pv -match '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') { $ver = $Matches[1] }
+}
+if (-not $ver -and ($agent -match '^(claude|codex|grok|kimi)$')) {
+    $binPath = $null
+    $envBin = [Environment]::GetEnvironmentVariable("HST_$($agent.ToUpper())_BIN")
+    if ($envBin -and (Test-Path -LiteralPath $envBin)) { $binPath = $envBin }
+    if (-not $binPath -and $env:HST_AGENT_PATH) {
+        $sep = if ($IsWindows) { ';' } else { ':' }
+        foreach ($ad in ($env:HST_AGENT_PATH -split [regex]::Escape($sep))) {
+            if (-not $ad) { continue }
+            foreach ($c in @((Join-Path $ad $agent), (Join-Path $ad "$agent.exe"), (Join-Path $ad "$agent.cmd"))) {
+                if (Test-Path -LiteralPath $c) { $binPath = $c; break }
+            }
+            if ($binPath) { break }
+        }
+    }
+    if (-not $binPath) {
+        $gcmd = @(Get-Command $agent -ErrorAction SilentlyContinue)[0]
+        if ($gcmd -and $gcmd.Source) { $binPath = "$($gcmd.Source)" }
+    }
+    if ($binPath) {
+        $gi = $null
+        try {
+            $gi = Get-Item -LiteralPath $binPath -ErrorAction Stop
+            # 软链解析一层：升级动目标不动链本体时键仍变（F5）。
+            if ($gi.LinkTarget) {
+                try { $g2 = Get-Item -LiteralPath $gi.LinkTarget -ErrorAction Stop; if ($g2) { $gi = $g2 } } catch {}
+            }
+        } catch { $gi = $null }
+        if ($gi) {
+            $binPath = "$($gi.FullName)"
+            # mtime / probed_at 记 ticks 整数串：ConvertFrom-Json 会把 ISO 日
+            # 期串自动转 [DateTime]（文化格式化后与 'o' 串永不相等，本机实
+            # 弹踩坑），整数键免转换、比较精确且文化无关。
+            $binMtime = "$($gi.LastWriteTimeUtc.Ticks)"
+            $binSize = "$($gi.Length)"
+            $verDir = if ($env:HST_VER_CACHE_DIR) { $env:HST_VER_CACHE_DIR } elseif ($HOME) { Join-Path (Join-Path $HOME '.hst') 'cache' }
+            $verFile = if ($verDir) { Join-Path $verDir "agent-version-$agent.json" } else { $null }
+            $ent = $null
+            if ($verFile -and (Test-Path -LiteralPath $verFile)) {
+                try { $ent = Get-Content -Raw -LiteralPath $verFile | ConvertFrom-Json } catch { $ent = $null }
+            }
+            $needProbe = $true
+            $nowTicks = [DateTime]::UtcNow.Ticks
+            $win5 = [TimeSpan]::FromMinutes(5).Ticks
+            $d7 = [TimeSpan]::FromDays(7).Ticks
+            if ($ent -and ("$($ent.bin)" -eq $binPath) -and ("$($ent.mtime)" -eq $binMtime) -and ("$($ent.size)" -eq $binSize)) {
+                $probedTicks = $null
+                try { $probedTicks = [Int64]"$($ent.probed_at)" } catch { $probedTicks = $null }
+                if ($ent.version) {
+                    $ver = "$($ent.version)"
+                    $needProbe = $false
+                    # 7 天兜底：壳与保留 mtime 的升级键不变，到期强制重探；
+                    # probed_at 坏值按到期处理。
+                    if ($null -eq $probedTicks -or ($nowTicks - $probedTicks) -ge $d7) { $ver = $null; $needProbe = $true }
+                } elseif ($null -ne $probedTicks -and ($nowTicks - $probedTicks) -lt $win5) {
+                    # 上次探测失败：静默窗内不重试（保持无版本），窗外重探。
+                    $needProbe = $false
+                }
+            }
+            if ($needProbe) {
+                try { $vout = (& $binPath --version 2>$null | Out-String).Trim() } catch { $vout = '' }
+                if ($vout -match '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') { $ver = $Matches[1] } else { $ver = $null }
+                if ($verFile) {
+                    try {
+                        $vd = Split-Path -Parent $verFile
+                        if (-not (Test-Path -LiteralPath $vd)) { New-Item -ItemType Directory -Path $vd -Force | Out-Null }
+                        $tmp = "$verFile.tmp"
+                        @{ version = "$ver"; bin = $binPath; mtime = $binMtime; size = $binSize; probed_at = "$nowTicks" } |
+                            ConvertTo-Json -Compress | Set-Content -LiteralPath $tmp -NoNewline -Encoding UTF8
+                        Move-Item -LiteralPath $tmp -Destination $verFile -Force
+                    } catch {}
+                }
+            }
+        }
+    }
+}
+$agentDisp = if ($ver) { "$agent $ver" } else { $agent }
 # 状态读序（D28，D45 去 oma 纪元旧名）：1) HST_STATE_FILE 覆盖；2) 用户级
 # session 键 ~/.hst/state/<agent>-<session>.json（session 取 payload
 # session_id / sessionId）；3) 用户级 <agent>.json（agent 最新）；4) 项目级
@@ -189,7 +284,7 @@ $stateColor = switch ($state) {
     'blocked' { '38;5;203' }
     default { '38;5;245' }
 }
-$hstTxt = ApplyFmt (Tmpl 'hst') @{ icon = (Ico 'hst'); agent = $agent; state = $state }
+$hstTxt = ApplyFmt (Tmpl 'hst') @{ icon = (Ico 'hst'); agent = $agentDisp; state = $state }
 $parts.Add((Seg $hstTxt $stateColor))
 "#;
 
@@ -1247,8 +1342,9 @@ segments3 = []
 # codex 内置项子集（[codex] items）：替换写入 ~/.codex/config.toml 的
 # [tui].status_line 内置项 ID 清单；未知 id codex 侧静默跳过（S016）。
 # codex 只有内置项面（无外部命令 statusline），D40 后缺省集已含 token
-# 细分（used / total-input / total-output / window）；tools 与 MCP 计数、
-# context 构成 codex 能力面不可达。
+# 细分（used / total-input / total-output / window），D46 加 codex-version
+# （版本段 codex 侧承载）；tools 与 MCP 计数、context 构成 codex 能力面
+# 不可达。
 # 例（只要分支与目录）：
 # [codex]
 # items = ["current-dir", "git-branch"]
@@ -1263,9 +1359,12 @@ segments3 = []
 /// 清单——源码 status_line_setup.rs 全量约 30 项）。token 细分（used/
 /// input/output/window）是 codex 侧对 D40「token 用量」要素的承载；
 /// tools 计数、MCP 计数、context 构成三要素 codex 能力面不可达（差距
-/// 说明见 S034 追记与 R002）。
+/// 说明见 S034 追记与 R002）。D46 加 `codex-version`（源码实证
+/// `StatusLineItem::CodexVersion`，strum kebab_case ID），codex 侧版本
+/// 显示走内置项，与 pwsh 面版本并入 agent 名同要素。
 const CODEX_STATUS_LINE_ITEMS: &[&str] = &[
     "run-state",
+    "codex-version",
     "model-with-reasoning",
     "context-used",
     "context-remaining",
@@ -1519,9 +1618,11 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         // 封闭性：HOME 钉 scratch（D28 用户级读序会看真实 ~/.hst/state，
         // 机器上的活会话状态会污染判据），cwd 同钉（无 git 无项目 state）。
-        let stdout = run_statusline(&p, "claude", &home, b"{}");
+        // payload 带 version（D46）：钉死版本来源，机器装没装真 claude 判据
+        // 都确定，顺带钉「版本并入 {agent} 值、用户模板无需新占位符」。
+        let stdout = run_statusline(&p, "claude", &home, br#"{"version":"9.9.9"}"#);
         assert!(
-            stdout.contains("claude[unknown]"),
+            stdout.contains("claude 9.9.9[unknown]"),
             "user template wins: {stdout}"
         );
         assert!(
@@ -1553,13 +1654,26 @@ mod tests {
         )
         .unwrap();
         let p = deploy_script(&home).unwrap();
-        let out = run_statusline(&p, "claude", &home, br#"{"session_id":"s1"}"#);
-        assert!(out.contains("claude:working"), "session-keyed wins: {out}");
+        let out = run_statusline(
+            &p,
+            "claude",
+            &home,
+            br#"{"session_id":"s1","version":"9.9.9"}"#,
+        );
+        assert!(
+            out.contains("claude 9.9.9:working"),
+            "session-keyed wins: {out}"
+        );
         // 键文件缺位时回落 agent 最新键；session 不符的最新键被闸掉。
         let _ = std::fs::remove_file(state.join("claude-s1.json"));
-        let out = run_statusline(&p, "claude", &home, br#"{"session_id":"s1"}"#);
+        let out = run_statusline(
+            &p,
+            "claude",
+            &home,
+            br#"{"session_id":"s1","version":"9.9.9"}"#,
+        );
         assert!(
-            out.contains("claude:unknown"),
+            out.contains("claude 9.9.9:unknown"),
             "mismatched latest must be gated: {out}"
         );
         // kimi camelCase sessionId 同样命中键路径。
@@ -1568,17 +1682,34 @@ mod tests {
             r#"{"state":"idle","session":"k1"}"#,
         )
         .unwrap();
-        let out = run_statusline(&p, "kimi", &home, br#"{"sessionId":"k1"}"#);
+        let out = run_statusline(
+            &p,
+            "kimi",
+            &home,
+            br#"{"sessionId":"k1","version":"9.9.9"}"#,
+        );
         assert!(
-            out.contains("kimi:idle"),
+            out.contains("kimi 9.9.9:idle"),
             "camelCase sessionId hits keyed path: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
     }
 
     /// 直跑状态栏脚本的公共小工具（行为测试用）：env 钉临时 HOME、清覆盖
-    /// 变量，喂 stdin，收 stdout。
+    /// 变量（含 D46 版本探针的定位与缓存 env，保证机器上装没装真 agent
+    /// 判据都确定），喂 stdin，收 stdout。
     fn run_statusline(script: &Path, agent: &str, home: &Path, stdin: &[u8]) -> String {
+        run_statusline_with(script, agent, home, stdin, &[])
+    }
+
+    /// run_statusline 带额外 env（D46 探针定位 / 缓存隔离通道用）。
+    fn run_statusline_with(
+        script: &Path,
+        agent: &str,
+        home: &Path,
+        stdin: &[u8],
+        extra_env: &[(&str, std::ffi::OsString)],
+    ) -> String {
         use std::io::Write;
         use std::process::{Command, Stdio};
         let mut cmd = Command::new("pwsh");
@@ -1588,7 +1719,16 @@ mod tests {
             .arg(agent)
             .current_dir(home)
             .env_remove("HST_AGENT")
-            .env_remove("HST_STATE_FILE");
+            .env_remove("HST_STATE_FILE")
+            .env_remove("HST_VER_CACHE_DIR")
+            .env_remove("HST_AGENT_PATH")
+            .env_remove("HST_CLAUDE_BIN")
+            .env_remove("HST_CODEX_BIN")
+            .env_remove("HST_GROK_BIN")
+            .env_remove("HST_KIMI_BIN");
+        for (k, v) in extra_env {
+            cmd.env(k, v);
+        }
         // PowerShell $HOME：Windows 随 USERPROFILE、Unix 随 HOME（S025）。
         if cfg!(windows) {
             cmd.env("USERPROFILE", home);
@@ -1620,6 +1760,156 @@ mod tests {
         let out = run_statusline(&p, "claude", &home, &bytes);
         assert!(out.contains("团队"), "chinese dir must survive: {out}");
         assert!(!out.contains('缁'), "no GBK mojibake: {out}");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn d46_payload_version_normalizes_and_nonnumeric_falls_back() {
+        // D46（codex F1/F2）：payload version 与 probe 输出走同一条归一化
+        //（`数字.数字` 起头 token）；非数字版本（如 nightly）不显示，回落
+        // 旧形 `claude:state`——显示面与 verify 判据同源（S025）。grok 文档
+        // 级 payload 可能为带壳串（`1.0.30 (hash)` 形），归一化后只取版本。
+        if !pwsh_on_path() {
+            return;
+        }
+        let home = scratch("d46norm");
+        let p = deploy_script(&home).unwrap();
+        // 非数字：不显示版本，旧形保留。agent 用非白名单名（claudex）：探针
+        // 白名单只放行四家，非四家不探，机器装没装真 claude 判据都确定。
+        let out = run_statusline(&p, "claudex", &home, br#"{"version":"nightly"}"#);
+        assert!(
+            out.contains("claudex:unknown") && !out.contains("nightly"),
+            "non-numeric version falls back to plain marker: {out}"
+        );
+        // 带壳串：归一化提取裸版本。
+        let out = run_statusline(&p, "grok", &home, br#"{"version":"1.0.30 (hash)"}"#);
+        assert!(
+            out.contains("grok 1.0.30:unknown"),
+            "shelled version normalizes to bare token: {out}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn d46_probe_resolves_env_bin_and_caches_atomically() {
+        // D46（codex F4/F6/F7）：probe 定位序 HST_<AGENT>_BIN 显式钉优先；
+        // HST_VER_CACHE_DIR 覆盖目录；缓存原子落盘（无 .tmp 残留）；键记
+        // size 字段（三元组）。假 claude 可执行件钉死判据（不依赖机器装没
+        // 装真 agent）。
+        if !pwsh_on_path() {
+            return;
+        }
+        let home = scratch("d46probe");
+        let fake_dir = home.join("fakebin");
+        std::fs::create_dir_all(&fake_dir).unwrap();
+        let fake = if cfg!(windows) {
+            let f = fake_dir.join("claude.cmd");
+            std::fs::write(&f, "@echo claude 3.2.1 (fake-build)\r\n").unwrap();
+            f
+        } else {
+            let f = fake_dir.join("claude");
+            std::fs::write(&f, "#!/bin/sh\necho 'claude 3.2.1 (fake-build)'\n").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+            f
+        };
+        let cache = home.join("vcache");
+        let envs: Vec<(&str, std::ffi::OsString)> = vec![
+            ("HST_CLAUDE_BIN", fake.as_os_str().to_os_string()),
+            ("HST_VER_CACHE_DIR", cache.as_os_str().to_os_string()),
+        ];
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
+        assert!(
+            out.contains("claude 3.2.1:unknown"),
+            "env-pinned binary is probed and versioned: {out}"
+        );
+        let ver_file = cache.join("agent-version-claude.json");
+        let cached = std::fs::read_to_string(&ver_file).unwrap();
+        assert!(
+            cached.contains("\"version\":\"3.2.1\"") && cached.contains("\"size\""),
+            "cache entry has version and size key: {cached}"
+        );
+        assert!(
+            !cache.join("agent-version-claude.json.tmp").exists(),
+            "atomic rename leaves no tmp file"
+        );
+        // 第二跑：缓存命中路径，同判据稳定（三元组未变不重探）。
+        let out2 = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
+        assert!(
+            out2.contains("claude 3.2.1:unknown"),
+            "cache hit path renders identically: {out2}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn d46_probe_failure_writes_silent_window_entry() {
+        // D46（codex F6/F8 三态机）：探测失败记空值加 probed_at；静默窗内
+        // 不重探（probed_at 不变）；窗外重探（probed_at 前移）。钉一个存在
+        // 但不可执行的假件逼失败路径。
+        if !pwsh_on_path() {
+            return;
+        }
+        let home = scratch("d46fail");
+        let fake_dir = home.join("fakebin");
+        std::fs::create_dir_all(&fake_dir).unwrap();
+        // .bin 扩展名：不可执行也无文件关联，& 调用必抛（防 Windows 关联
+        // 打开真程序），Unix 无执行位同样拒。
+        let fake = fake_dir.join("claude-fake.bin");
+        std::fs::write(&fake, "not an executable").unwrap();
+        let cache = home.join("vcache");
+        let envs: Vec<(&str, std::ffi::OsString)> = vec![
+            ("HST_CLAUDE_BIN", fake.as_os_str().to_os_string()),
+            ("HST_VER_CACHE_DIR", cache.as_os_str().to_os_string()),
+        ];
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
+        assert!(
+            out.contains("claude:unknown"),
+            "failed probe falls back to plain marker: {out}"
+        );
+        let ver_file = cache.join("agent-version-claude.json");
+        let first = std::fs::read_to_string(&ver_file).unwrap();
+        assert!(
+            first.contains("\"version\":\"\""),
+            "failure caches empty version: {first}"
+        );
+        // 静默窗内第二跑：判据不变（无版本），probed_at 原样（未重探）。
+        let out2 = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
+        assert!(out2.contains("claude:unknown"), "{out2}");
+        let second = std::fs::read_to_string(&ver_file).unwrap();
+        assert_eq!(
+            first, second,
+            "inside the 5-minute silence window no re-probe happens"
+        );
+        // 窗外（probed_at ticks 拨回 10 分钟前）：重探一次（仍失败，
+        // probed_at 前移到当下，数值比较免 ConvertTo-Json 键序抖动）。
+        let json: serde_json::Value = serde_json::from_str(&second).unwrap();
+        let old_ticks: i64 = json
+            .get("probed_at")
+            .and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok()))
+            .unwrap_or_default();
+        assert!(old_ticks > 0, "probed_at present: {second}");
+        let shifted = serde_json::Value::String((old_ticks - 600_000_000_000_i64).to_string());
+        let mut json = json;
+        json["probed_at"] = shifted;
+        std::fs::write(&ver_file, serde_json::to_string(&json).unwrap()).unwrap();
+        let out3 = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
+        assert!(out3.contains("claude:unknown"), "{out3}");
+        let third = std::fs::read_to_string(&ver_file).unwrap();
+        let third_ticks: i64 = serde_json::from_str::<serde_json::Value>(&third)
+            .unwrap()
+            .get("probed_at")
+            .and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok()))
+            .unwrap_or_default();
+        assert!(
+            third_ticks > old_ticks,
+            "outside the silence window the probe re-runs and re-stamps: {third}"
+        );
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -1933,8 +2223,9 @@ mod tests {
             "[package]\nname = \"probe-fixture\"\nversion = \"9.9.9\"\n",
         )
         .unwrap();
-        // cost 295200000 ms 经 FmtDur 恰为 3d10h（用户裁定示例形态）。
-        let stdin = br#"{"session_id":"d1","context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":295200000}}"#;
+        // cost 295200000 ms 经 FmtDur 恰为 3d10h（用户裁定示例形态）；payload
+        // version 钉死版本来源（D46），机器装没装真 agent 判据都确定。
+        let stdin = br#"{"session_id":"d1","version":"2.1.270","context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":295200000}}"#;
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, stdin);
         let lines: Vec<&str> = out.lines().filter(|l| !l.trim().is_empty()).collect();
@@ -1952,9 +2243,10 @@ mod tests {
             !lines[0].contains("20% ["),
             "context belongs to row 2: {out}"
         );
-        // 二行 agent 状态：agent 态加耗时；context 段百分比直跟 token
-        // 绝对值括号（FmtTok 1024 进位：200000/1024=195k、1000000/1024=977k）。
-        assert!(lines[1].contains("claude:unknown"), "{out}");
+        // 二行 agent 状态：agent 态（D46 带版本形）加耗时；context 段百分比
+        // 直跟 token 绝对值括号（FmtTok 1024 进位：200000/1024=195k、
+        // 1000000/1024=977k）。
+        assert!(lines[1].contains("claude 2.1.270:unknown"), "{out}");
         assert!(
             lines[1].contains("20% [195k/977k]"),
             "D43 context shows absolute tokens, not mix: {out}"
@@ -1976,7 +2268,7 @@ mod tests {
             "kimi merges rows to one line: {out_kimi}"
         );
         assert!(
-            out_kimi.contains("kimi:unknown") && out_kimi.contains("195k/977k"),
+            out_kimi.contains("kimi 2.1.270:unknown") && out_kimi.contains("195k/977k"),
             "kimi single line keeps agent state and tokens: {out_kimi}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -2033,10 +2325,10 @@ mod tests {
             "segments = [\"hst\"]\nsegments2 = [\"model\"]\nsegments3 = [\"tokens\"]\nsingle_line = true\n",
         )
         .unwrap();
-        let stdin = br#"{"context_window":{"context_window_size":1024,"used_percentage":50}}"#;
+        let stdin = br#"{"version":"9.9.9","context_window":{"context_window_size":1024,"used_percentage":50}}"#;
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, stdin);
-        assert!(out.contains("claude:unknown"), "{out}");
+        assert!(out.contains("claude 9.9.9:unknown"), "{out}");
         assert!(out.contains("512/1k"), "{out}");
         assert_eq!(
             out.lines().filter(|l| !l.trim().is_empty()).count(),
@@ -2056,7 +2348,7 @@ mod tests {
             return;
         }
         let real_payload =
-            br#"{"context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":51540000}}"#;
+            br#"{"version":"9.9.9","context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":51540000}}"#;
         // 形 1：v1.1.0 双排原样（EXAMPLE_TOML 上一版，D45 起段名 oma 改
         // hst，夹具同步）——segments3 补默认去重（tools 等已在 segments2，
         // 剔空；剩无重复段）。
@@ -2072,7 +2364,7 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude:unknown") && out.contains("195k/977k"),
+            out.contains("claude 9.9.9:unknown") && out.contains("195k/977k"),
             "v1.1.0 dual-row config upgrades cleanly: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -2090,7 +2382,7 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude:unknown") && out.contains("20% [195k/977k]"),
+            out.contains("claude 9.9.9:unknown") && out.contains("20% [195k/977k]"),
             "D18 single-row full config upgrades cleanly (D43 context form): {out}"
         );
         assert_eq!(
@@ -2218,6 +2510,9 @@ mod tests {
     fn codex_tui_section_is_builtin_ids_not_command_argv() {
         let tui = render_codex_tui_section(CODEX_STATUS_LINE_ITEMS);
         assert!(tui.contains("run-state"));
+        // D46：codex 侧版本走内置项 codex-version（源码实证
+        // StatusLineItem::CodexVersion，strum kebab_case）。
+        assert!(tui.contains("codex-version"));
         assert!(tui.contains("git-branch"));
         assert!(tui.contains("status_line_use_colors = true"));
         assert!(

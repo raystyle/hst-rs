@@ -3,14 +3,14 @@
 > 角色：**当前目标方案文档**：基于 `docs\research\`（为什么）与 `docs\references\`（怎么做）撰写的执行计划；每条挂依据来源，随目标变化更新，不存历史目标。
 > 分工：`PRD.md` = 要什么；`TODO.md` = 做到哪；本文件 = 怎么做；通用工作流见 `docs\guide\G003-工作流标准细则-从登记到归档五步.md`。
 
-## 当前目标：D31 至 D33 ohmycloud 协调批
+## 当前目标：D46 状态栏 agent 版本段
 
-> 目标随批发 v1.0.0（D34 版本线重开：hst 版本号不接 oma 老线，与 ark 1.0.0 同语义开山版；v0.6.x 表述转更名过渡期记录）。
+> v1.1.4 方向；发版链与评审闸门见第五段。
 
-> 依据：PRD D31 / D32 / D33（ohmycloud 外部协调来函 2026-09-13，来函即澄清）。五段：
+> 依据：PRD D46（用户裁 2026-09-13 加追问链三裁）；S025 机读标记契约、S034 D40 落地追记（codex 内置项面）、D44 两行终态（DEFAULT_SEGMENTS2）。五段：
 
-1. **D31 域名清扫**：四处明文摘除（`src\diagnose.rs` 注释、README、R002 2.5 节、P0041 背景），表述统一「api 缓存回归测试端点（配置注入）」；代码端点本就 env 加 agent 配置注入（`HST_GATEWAY_URL` 覆盖序），无硬编码不改逻辑；全仓 grep 复扫归零。
-2. **D32 旗标连字符化**：clap `pretrust` 参数显式 `long = "pre-trust"` 加隐藏 `alias = "pretrust"`（兼容窗口到 1.1.0，与 OMA_* env 同批清；版本线重开见 D34）；kv 标记 `init.pretrust.*` 不动（机器面冻结）；全仓 md 的 `--pre-trust` 批量更正（含历史档案：旧拼写仍为可用别名，命令逐字可复跑无失真，更正口径记 diary）。
-3. **D33 yolo 分级**：`yolo.rs` 加 `YoloLevel`（full/partial/off，clap ValueEnum）；两级旗标改取值式 `--yolo[=<级别>]` / `--project-yolo[=<级别>]`（缺省 full，裸旗标兼容）；写入矩阵：claude full=bypassPermissions 加 skip 加 enableAll、partial=acceptEdits 加 skip（MCP 归 trust 面不写）、codex full=danger-full-access/never、partial=workspace-write/on-request、kimi yolo/auto、grok always-approve/auto（取值证据 grok-build `permissions.rs` canonical 值集）；off=按 ours 等值摘除（新 `retire_user_yolo_with`，项目面 `retire_project_yolo` 扩认 partial 值），空文件删除、用户自设值保留；doctor 判据分级接受（partial 不误报，双级冲突 warn 沿用）；COMMAND_MAP init 行更新。
-4. **测试与门禁**：yolo.rs 单测（partial 形状、full 转 off 退役、用户自设值幸存）加 doctor partial 判据用例加 cli 集成（`--yolo=partial` 标记与落盘、`--yolo=off` 退役、`--project-yolo=off`、`--pre-trust` 新拼写与旧别名双跑、非法级别退出 2）；全量测试加 fmt/clippy 加 rumdl 加 .tools 三扫描；dogfood `hst init` 重生 SKILL 加 `hst skill --write`。
-5. **发版与归档**：版本 1.0.0（D34 版本线重开）、CHANGELOG 里程碑与版本线注记、R002/R007/R001/AGENTS/INDEX/S007 追记随批；README 精简重写与仓库描述一句话（D35 需求四）；herdr 同步右侧 codex 独立评审达成一致后才 tag v1.0.0（用户令），随后镜像 hst/stable 段到货核验、herdr 知会 ohmycloud；D36 状态栏 HUD 簇研究先行（S 文档加追问链，不阻塞本批）；P0048 归档加 diary。
+1. **版本段实现（src\statusline.rs）**：SEG_OMA 段块加版本获取两级：payload `version` 字段优先（claude 官方 stdin 契约带自家版本）；否则 mtime 键控 probe：每帧 `Get-Command <agent>` 定位二进制取 `LastWriteTimeUtc`（零子进程），与缓存比对，mtime 变了或无缓存才重探一次 `& <bin> --version`（正则取 `数字.数字` 起头版本串），探测失败写空值加 `probed_at`（5 分钟静默窗内不重试，防每帧 spawn）。缓存按 agent 单文件 `~/.hst/cache/agent-version-<agent>.json`（version/bin/mtime/probed_at 四字段，单写者无整文件并发覆写），`HST_VER_CACHE_DIR` env 覆盖目录（verify 与测试隔离通道，对齐 HST_STATE_FILE 先例）。版本并入 `{agent}` 值（`claude 2.1.270`），模板与占位符零变化、用户自定义模板兼容；**$agent 变量本体不动**（state 文件定位仍吃纯名），另立 `$agentDisp` 渲染。探不到版本回落旧形 `claude:working`。
+2. **机读标记与 codex 面（src\verify.rs 加 statusline.rs）**：`statusline_marker_ok` 判据改两形兼容（`<agent>:` 直连旧形、`<agent> <version>:` 新形，版本 token 数字起头）；codex 缺省内置项集 `CODEX_STATUS_LINE_ITEMS` 加 `codex-version`（源码取证：`StatusLineItem::CodexVersion`，strum kebab_case，run-state 首位锚后插）变十三项。
+3. **测试与门禁**：单测（marker 两形判据正负例、codex 十三项烘焙、PS1 含版本两级逻辑与 HST_VER_CACHE_DIR）；集成（mock stdin 带 version 字段出新形标记、无 version 且二进制不在 PATH 回落旧形、HST_VER_CACHE_DIR 隔离下 probe 路径真跑一次后缓存命中）；全量测试加 fmt/clippy 加 rumdl 加 .tools 三扫描。
+4. **文档同步**：R002 状态栏行（版本段口径、缓存与 env、marker 形变、codex 十三项）与 verify 行（判据两形）；S025 机读标记契约 D46 修订（herdr 消费面知会随回执）；S034 D46 追记（codex-version 实证）；INDEX statusline 与 verify 行、CHANGELOG v1.1.4 里程碑。
+5. **评审与发版**：herdr 右侧 codex 两轮（设计轮已发、diff 轮随实现）达成一致后 tag v1.1.4（用户令「要让右侧 codex review」）；CI 绿、镜像 hst/stable 滚动 digest 三方对账、本机换装重跑 `hst statusline` 实弹；herdr 回执 ohmycloud（含 S025 标记形变知会，herdr 消费面同步）；wsl 总台 verify G8 面复验随新版（对端动作，回执后关账）；TODO 收口加 diary。

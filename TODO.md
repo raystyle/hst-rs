@@ -4,27 +4,20 @@
 
 ## 当前目标
 
-D31 至 D35 ohmycloud 协调批（2026-09-13 当日闭环归档 P0048，v1.0.0 发版）：
+D46 状态栏 agent 版本段（2026-09-13 立项，v1.1.4 方向）：
 
-- [x] D31 私有网关域名清扫（diagnose.rs 注释、README、R002、P0041 四处；grep 复扫归零）
-- [x] D32 `--pre-trust` 连字符化（clap 别名兼容、全仓 md 更正、kv 标记不动）
-- [x] D33 yolo 分级（YoloLevel 取值式旗标两级、写入矩阵、off 退役、doctor 分级判据、COMMAND_MAP）
-- [x] 测试与门禁（160 单测加 27 集成全绿、fmt/clippy、rumdl 加 .tools 三扫描、dogfood SKILL 再生）
-- [x] D34 版本线重开 1.0.0（Cargo 与 CHANGELOG 版本线重开、v0.6.x 表述转更名过渡期记录）
-- [x] D35 需求四：README 精简重写与仓库描述一句话（gh repo edit 已生效）
-- [x] codex 评审达成一致（三轮：F1 裁 a 加降级回归、A 裁改口径、B 至 E 收口、终局零新发现）
-- [x] 发版 v1.0.0（tag ed94f94、CI 绿、十二资产齐、镜像双段到货 digest 三方对账全等、herdr 知会 ohmycloud）
-- [x] D36 状态栏 HUD 研究先行（S034 落档；设计追问链待启，见队列）
-- [x] 归档（P0048、四原语收口、diary）
-- [x] D37 verify 状态栏层环境探测（ohmywsl 总台 I3 适配：未部署面与缺 pwsh 转 skip，断链仍 fail；162 单测加 27 集成绿）
-- [x] D38 活体验收环境容错（总台三轮到点：grok/kimi 结果容错版，hook 层 ok 才计入活体断言、不成 skip 带首条 reason；产品 verify 面不动；R004 三.6 修订）
-- [x] D39 Windows hook 注册 sh 兼容形态（第 1 轮 ps1 桥加 M062；第 2 轮幂等漏清扫加 M063；第 3、4 轮 codex review F/G/H 系全收零异议；宿主 v1.0.0 旧二进制复踩双注册后发 v1.0.1 滚 stable）
-- [x] D40 状态栏双排与三要素（v1.1.0 已发：tag 424ff92，codex 三轮零异议，镜像双段到货 digest 全等 e8a9effeb3c2，herdr 已知会；wsl 总台 verify G8 复验随新版）
+- [ ] 版本段实现（src\statusline.rs：SEG_OMA 两级版本获取、mtime 键控 probe 加 5 分钟失败静默窗、`~/.hst/cache/agent-version-<agent>.json` 单文件缓存、HST_VER_CACHE_DIR 覆盖、版本并入 `{agent}` 值模板零变化、$agent 本体不动）
+- [ ] 机读标记与 codex 面（src\verify.rs marker 判据两形兼容；CODEX_STATUS_LINE_ITEMS 加 codex-version 变十三项）
+- [ ] 测试与门禁（单测加集成：stdin version 出新形、无版本回落旧形、probe 路径隔离真跑；全量加 fmt/clippy 加 rumdl 加 .tools 三扫描）
+- [ ] 文档同步（R002 状态栏与 verify 行、S025 标记契约 D46 修订、S034 追记、INDEX、CHANGELOG）
+- [ ] herdr 右侧 codex 两轮 review 达成一致（设计轮已发；diff 轮随实现后；用户令）
+- [ ] 发版 v1.1.4（tag、CI 绿、镜像 hst/stable 滚动 digest 三方对账、本机换装重跑 hst statusline 实弹、herdr 回执 ohmycloud 含 S025 标记形变知会）
+- [ ] wsl 总台 verify G8 面复验随新版（对端动作，回执后关账）
+- [ ] 收口（TODO 清账、GOAL 历史、diary）
+
+D31 至 D45 前目标（2026-09-13 ohmycloud 协调批与状态栏 HUD 迭代五连发，v1.0.0 至 v1.1.3；G2 补钉一行除外，见队列）：清单见 git 历史。
+
 - [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞；D42 三行测试已顺带钉 kimi 并一行，剩 grok）
-- [x] D42 状态栏三行重分组（v1.1.1 已发：tag 3cfd31a，codex 三轮零异议，镜像双段到货 digest 全等 edfd970c8635，herdr 已知会）
-- [x] D43 状态栏三行精修五点（v1.1.2 已发：tag 005e2d1，codex 两轮零异议，十二资产齐含最后一批 oma stub，win digest 三方全等 4088acf8）
-- [x] D44 状态栏两行终态（v1.1.3 已发：默认两行重排加空行剔除，显式第三行 opt-in 面保留 D40 三要素覆盖）
-- [x] D45 oma 遗产清扫（v1.1.3 已发：tag 26eabaa，codex 两轮放行，六资产纯 hst-*，win digest 三方全等 501fe135；本地 ~/.hst/bin 换装 v1.1.3 重跑 init、~/.oma 转发层与 cargo bin oma stub 已删；herdr 回执 ohmycloud 已发含 oma/ 段冻结值与收段动作）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 

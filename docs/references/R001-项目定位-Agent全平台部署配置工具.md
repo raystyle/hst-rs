@@ -39,4 +39,4 @@ HST（Hooks, Statusline, Trace；原 Oh My Agents / oma，v0.6.0 更名过渡期
 
 ## 约束在一个项目
 
-启动 cwd 或 `--project` 就是唯一工作区。skill 与 AGENTS / CLAUDE.md 落项目目录；hook 注册与 shim 常驻用户级（`~/.hst/hooks/`，D28），状态按 session 分键写 `~/.hst/state/`（供状态栏 `agent:state` 机读标记消费，S025，未 init 项目也有状态数据）。信任库（各 agent 记在用户家）可以预写（`--pre-trust`）。
+启动 cwd 或 `--project` 就是唯一工作区。skill 与 AGENTS / CLAUDE.md 落项目目录；hook 注册与 shim 常驻用户级（`~/.hst/hooks/`，D28），状态按 session 分键写 `~/.hst/state/`（供状态栏 `agent:state` 机读标记消费，S025，未 init 项目也有状态数据），状态栏脚本释放 `~/.hst/statusline/`，agent 版本探针缓存 `~/.hst/cache/`（D46，按 agent 单文件 `agent-version-<agent>.json`）。信任库（各 agent 记在用户家）可以预写（`--pre-trust`）。

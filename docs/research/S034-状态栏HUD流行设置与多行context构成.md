@@ -61,3 +61,12 @@
 - **context 构成**：官方 payload 确认只有 used / total 两级，构成走 transcript 解析（`transcript_path` 尾 500 行按行字符量三分估算占比，无真实 token 计量，近似口径已入 R002）[实证: 本机双排渲染实弹，`8%` 加 mix 段]。
 - **MCP / tools 计数**：MCP = stdin `mcp_servers`（claude 官方字段）优先，回落 `~/.claude.json` 加 `.mcp.json` 键数；tools = transcript `tool_use` 计数 [实证: 集成钉 + 本机实弹]。
 - **codex 能力边界（本轮源码取证）**：`status_line_setup.rs` 全量约 30 个内置项（model / run-state / context-used / used-tokens / total-input-tokens / total-output-tokens / context-window-size / git-branch / branch-changes / hostname / thread-title / task-progress 等），**无外部命令面**（openai/codex#17827、#20244 未实现）。可达形态 = 富内置项清单（D40 缺省集已升十二项，token 细分四项承载「token 用量」要素）；不可达 = tools 计数、MCP 计数、context 构成（与三要素的差距说明）[实证: openai/codex 源码 status_line_setup.rs 2026-09-13]。
+
+## D46 落地追记：agent 版本段
+
+> 2026-09-13，v1.1.4 方向；用户裁数据源两级（stdin version 直用，否则本地 probe 加缓存）。
+
+- **codex 内置项实证**：`StatusLineItem::CodexVersion` 存在（`status_line_setup.rs` 底部 `bottom_pane/` 路径，枚举 doc 注释 "Codex application version"），strum `serialize_all = "kebab_case"` 序列化即配置 ID `codex-version`；herdr 右侧 codex 评审在本机 codex v0.154.0 二进制内复核 `codex-version` 与 `CodexVersion` 各 3 处 [实证: openai/codex 源码 + 本机二进制 rg 2026-09-13]。D46 缺省集升十三项（run-state 后插 codex-version），codex 侧版本走自家内置项，与 pwsh 面（版本并入 agent 名）是**两套机制**。
+- **stdin payload version 三家实证**（herdr codex 设计轮取证）：claude 二进制内 JSON 构造 `version: {...VERSION:"2.1.268"...}.VERSION` 裸串；kimi 二进制 `statusLinePayload(){ ... version: state.version }` 裸值；grok 到文档级（字段表 `version | Grok release, for display`），带壳可能未除，故 D46 实现对 payload 值与 probe 输出套同一条归一化（`数字.数字` 起头 token），带壳与 nightly 都安全 [实证: kimi/grok/claude 本机二进制取证 2026-09-13；grok 真值待 wsl 总台 G8 复验回填]。
+- **机读标记形变**：`agent:state` 可带版本成 `agent <version>:state`（S025 规范语法与消费方清单）；verify 判据两形兼容，herdr 消费面随 v1.1.4 回执知会。
+- **探针缓存坑（本机实弹）**：pwsh 7 `ConvertFrom-Json` 把 ISO 日期串自动转 `[DateTime]`（文化格式化后与 'o' 串永不相等），缓存键 mtime/probed_at 改记 ticks 整数串免疫。

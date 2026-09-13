@@ -8,13 +8,13 @@
 > 当前目标的起点：何时发起、为什么发起、要解决什么问题。
 
 - **日期**：2026-09-13。
-- **起点**：D31 至 D35 已当日闭环。ohmycloud WSL 总台外部协调三件开工，日内并入 D34 版本线重开与 D35 README 两裁；herdr codex 三轮评审一致后发 v1.0.0。
+- **起点**：v1.1.3 发版与 oma 遗产清扫收口后，用户裁 v1.1.4 方向新需求 D46：状态栏第二行（agent 状态行）增加 agent 版本显示（如 claude 2.1.270、codex 0.154.0），数据源两级（stdin JSON version 直用，否则本地 probe 加缓存避免每帧起进程），发版滚 stable 回执，wsl 总台 verify G8 面随新版复验。
 
 ## 锚点
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：无（D31 至 D35 归档 P0048，v1.0.0 发版加镜像双段到货核验加 herdr 知会当日闭环；D36 状态栏 HUD 簇研究先行 S034 已落，追问链待启）。
+- **锚定的目标**：D46 状态栏 agent 版本段（v1.1.4）：版本并入 hst 段（`claude 2.1.270:working` 形）、mtime 键控 probe 缓存、codex-version 内置项入缺省集四家覆盖；herdr 右侧 codex review 闸门（设计轮加 diff 轮）达成一致后 tag v1.1.4 滚 stable，回执 ohmycloud，wsl 总台 G8 复验随新版。
 
 ### 推进时间线
 
@@ -22,6 +22,7 @@
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-13 | **D46 立项开工**：用户裁 v1.1.4 方向（状态栏二行 agent 版本段，数据源 stdin version 优先否则 probe 加缓存，发版滚 stable 回执，wsl 总台 G8 复验随新版）；追问链三裁落定（版本并入 hst 段 agent 名后加 S025 标记随批改形、mtime 键控单文件缓存加 5 分钟失败静默窗、codex 面源码取证 CodexVersion 内置项 ID codex-version 入缺省集）；herdr 右侧 codex 设计轮 review 已发（用户令「要让右侧 codex review」），diff 轮随实现后 |
 | 2026-09-13 | **D44 加 D45 收口与 v1.1.3 发版加本地清扫**：codex 两轮评审（一轮 F1 R004/R007 文档旧名、F2 shim 注释与 manifest 登记、G1 注释；二轮放行带 shim 落盘件注释残字顺带清零）；tag v1.1.3 打在 26eabaa，CI 绿、六资产纯 hst-*（stub 绝版）、win digest 三方对账全等（501fe13513ca）；本机换装 v1.1.3 重跑 init（shim 四件烘焙 HST_* 新名、两行栏实弹）；本地 oma 残留清零（~/.oma 转发层、cargo bin oma stub、旧 0.6.1 备份）；herdr 回执 ohmycloud（双版 digest、oma/ 段冻结值与收段动作、env 更名面、wsl 消费口径） |
 | 2026-09-13 | **D44 加 D45 与 v1.1.3 方向**：用户六令连发定状态栏两行终态（一行 shell/cwd/git/包版本工具链尾巴、二行 agent 态/模型/context 绝对值/耗时、去第三行）；oma 遗产清扫全落（段 id hst、HST_* env、OMA_* 兼容读删、别名与 stub 资产退役、init 清扫旧名 shim、self update 资产名钉 hst-* 连带根修 D29 以来选 stub 装自己的 bug）；170 单测加 28 集成绿；待 codex 评审后发 v1.1.3 滚 stable 加本地部署面清扫加 omc 回执 |
 | 2026-09-13 | **D43 收口加 v1.1.2 发版**：codex 两轮评审（一轮 F1 CTXPROBE 门控收紧、G1 断言收紧、H1 注释三轻件全收；二轮零新发现放行）；tag v1.1.2 打在 005e2d1，CI 绿、十二资产齐（含最后一批 oma stub 资产）、herdr 知会随 v1.1.3 合并回执 |
