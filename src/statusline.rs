@@ -913,18 +913,24 @@ fn parse_config(text: &str) -> Result<StatuslineConfig, String> {
 }
 
 /// 段序生效值（D42 三行）：三行各自取用户清单或默认序（未知与跨行重复
-/// id 由拼装器拒）。**默认行去重**（codex D42 评审 F1，升级破面修复）：
-/// 用户显式写过的段 id 从后续默认行剔除——v1.1.0 双排配置未写 segments3
-/// 时默认第三行追加 tools 等段与已写 segments2 重复，跨行重复检查直接硬
-/// 错退出 1；老单排全量配置同理（默认二/三行全被剔空 = 保持单行，与老
-/// 行为一致）。显式写的行不去重（跨行重复仍由拼装器拒）。
+/// id 由拼装器拒）。**老配置原样升级语义**（codex D42 评审 F1/H1 两轮收
+/// 口）：用户显式写过 `segments` 而未写任何后续行键时，未写的行**不补默
+/// 认**（D18 老单排与 v1.1.0 双排两种老形态原样升级，行为零漂移；新装
+/// 用户三键全缺省仍得三行默认）；用户写过任一后续行键（segments2 或
+/// segments3）时，未写的行**补默认并去重**（显式段 id 从默认行剔除，防
+/// 跨行重复硬错）。显式写的行不去重（跨行重复仍由拼装器拒）。
 fn effective_orders(cfg: &StatuslineConfig) -> Result<Vec<Vec<&str>>, String> {
     let rows = [
         (&cfg.segments, DEFAULT_SEGMENTS),
         (&cfg.segments2, DEFAULT_SEGMENTS2),
         (&cfg.segments3, DEFAULT_SEGMENTS3),
     ];
-    // 用户显式写过的段 id 全集：默认行剔除这些 id。
+    let any_later_row_written = cfg.segments2.is_some() || cfg.segments3.is_some();
+    // 老配置形态 = 用户写过 segments 且没写任何后续行键 → 后续缺省行不补
+    // （原样单行升级）。新装（segments 也缺省）与写过后续键的配置照常补
+    // 默认（去重）。
+    let legacy_single_row = cfg.segments.is_some() && !any_later_row_written;
+    // 用户显式写过的段 id 全集：补默认的行剔除这些 id。
     let user_ids: std::collections::HashSet<&str> = rows
         .iter()
         .filter_map(|(user, _)| user.as_ref())
@@ -932,8 +938,10 @@ fn effective_orders(cfg: &StatuslineConfig) -> Result<Vec<Vec<&str>>, String> {
         .collect();
     Ok(rows
         .iter()
-        .map(|(user, default)| match user {
+        .enumerate()
+        .map(|(i, (user, default))| match user {
             Some(segs) => segs.iter().map(String::as_str).collect(),
+            None if i > 0 && legacy_single_row => Vec::new(),
             None => default
                 .iter()
                 .copied()
@@ -1933,13 +1941,17 @@ mod tests {
 
     #[test]
     fn legacy_row_configs_upgrade_without_duplicate_error() {
-        // codex D42 评审 F1（升级破面）：用户显式写过的段从后续默认行剔
-        // 除——v1.1.0 双排配置（未写 segments3）与 D18 老单排全量配置都
-        // 不再撞跨行重复硬错。
+        // codex D42 评审 F1/H1（升级破面与口径）：v1.1.0 双排配置（未写
+        // segments3）补默认第三行并去重；D18 老单排（只写 segments）后续
+        // 行不补默认 = 原样单行（真实形 payload 下也一行，区分「行不在」
+        // 与「段自渲染空」）。
         if !pwsh_on_path() {
             return;
         }
-        // 形 1：v1.1.0 双排原样（EXAMPLE_TOML 上一版）。
+        let real_payload =
+            br#"{"context_window":{"context_window_size":1000000,"used_percentage":20},"cost":{"total_duration_ms":51540000}}"#;
+        // 形 1：v1.1.0 双排原样（EXAMPLE_TOML 上一版）——segments3 补默认
+        // 去重（tools 等已在 segments2，剔空；剩无重复段）。
         let home = scratch("upg1");
         std::fs::write(
             home.join("statusline.toml"),
@@ -1950,14 +1962,14 @@ mod tests {
         )
         .unwrap();
         let p = deploy_script(&home).unwrap();
-        let out = run_statusline(&p, "claude", &home, b"{}");
+        let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude:unknown"),
+            out.contains("claude:unknown") && out.contains("195k/977k"),
             "v1.1.0 dual-row config upgrades cleanly: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
-        // 形 2：D18 老单排全量（14 段一行）——默认二/三行全被剔空，保持
-        // 单行输出（老行为）。
+        // 形 2：D18 老单排全量（14 段一行）——未写后续行键，不补默认 =
+        // 真实形 payload 下仍是单行（老行为零漂移）。
         let home = scratch("upg2");
         std::fs::write(
             home.join("statusline.toml"),
@@ -1968,15 +1980,15 @@ mod tests {
         )
         .unwrap();
         let p = deploy_script(&home).unwrap();
-        let out = run_statusline(&p, "claude", &home, b"{}");
+        let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude:unknown"),
+            out.contains("claude:unknown") && out.contains("20%"),
             "D18 single-row full config upgrades cleanly: {out}"
         );
         assert_eq!(
             out.lines().filter(|l| !l.trim().is_empty()).count(),
             1,
-            "emptied default rows keep single line: {out}"
+            "legacy single-row config stays one line under real payload: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
     }
