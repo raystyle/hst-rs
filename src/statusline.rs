@@ -137,7 +137,7 @@ if ($dir) {
 /// 道与会话闸，机读标记 S025；D28 用户级 session 分键读序）。
 const SEG_OMA: &str = r#"
 # ── hst 段：当前 agent 名 + 版本（D46）+ 实时状态（hook 状态通道；机读
-# 标记见 S025，D46 起可带版本形 `claude 2.1.270:working`）──
+# 标记见 S025，D46 起可带连字符版本形 `claude-2.1.270:working`）──
 # agent 名：hst 会话 env 优先，部署参数次之（每家配置注入自家名字）。
 $agent = if ($env:HST_AGENT) { $env:HST_AGENT } else { $AgentName }
 # 版本两级（D46，codex 设计轮 F1/F2/F4/F5/F6 收口）：payload version 字
@@ -225,9 +225,16 @@ if (-not $ver -and ($agent -match '^(claude|codex|grok|kimi)$')) {
             # 帧裸 spawn，静默窗与三元组键全失效（codex diff 轮 F3），天然
             # 回落旧形。
             if ($needProbe -and $verFile) {
-                # stderr 回落与 agents.rs read_version 同口径（stdout 空取
-                # stderr，codex diff 轮 F4）。
-                try { $vout = (& $binPath --version 2>&1 | Out-String).Trim() } catch { $vout = '' }
+                # 两步取值（codex G1）：stdout 优先（2>$null 静默 stderr），
+                # 正则未中再单独取 stderr（2>&1 1>$null），不合流——与
+                # agents.rs read_version「stdout 空取 stderr」同口径，stderr
+                # 噪声里的版本样串不抢在 stdout 之前（多一次 spawn 只在缓存
+                # miss 路径，可接受）。
+                $vout = ''
+                try { $vout = (& $binPath --version 2>$null | Out-String).Trim() } catch { $vout = '' }
+                if ($vout -notmatch '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') {
+                    try { $vout = (& $binPath --version 2>&1 1>$null | Out-String).Trim() } catch { $vout = '' }
+                }
                 if ($vout -match '([0-9]+(\.[0-9]+)+[A-Za-z0-9.+-]*)') { $ver = $Matches[1] } else { $ver = $null }
                 try {
                     $vd = Split-Path -Parent $verFile
@@ -243,7 +250,7 @@ if (-not $ver -and ($agent -match '^(claude|codex|grok|kimi)$')) {
         }
     }
 }
-$agentDisp = if ($ver) { "$agent $ver" } else { $agent }
+$agentDisp = if ($ver) { "$agent-$ver" } else { $agent }
 # 状态读序（D28，D45 去 oma 纪元旧名）：1) HST_STATE_FILE 覆盖；2) 用户级
 # session 键 ~/.hst/state/<agent>-<session>.json（session 取 payload
 # session_id / sessionId）；3) 用户级 <agent>.json（agent 最新）；4) 项目级
@@ -1371,13 +1378,14 @@ segments3 = []
 /// tools 计数、MCP 计数、context 构成三要素 codex 能力面不可达（差距
 /// 说明见 S034 追记与 R002）。D46 加 `codex-version`（源码实证
 /// `StatusLineItem::CodexVersion`，strum kebab_case ID），codex 侧版本
-/// 显示走内置项，与 pwsh 面版本并入 agent 名同要素。
+/// 显示走内置项，与 pwsh 面版本并入 agent 名同要素；同轮用户裁去
+/// `context-remaining`（渲染成 left 百分比，与 `context-used` 的
+/// `Context N% used` 重复占宽，只留 used 形，缺省集回十二项）。
 const CODEX_STATUS_LINE_ITEMS: &[&str] = &[
     "run-state",
     "codex-version",
     "model-with-reasoning",
     "context-used",
-    "context-remaining",
     "used-tokens",
     "total-input-tokens",
     "total-output-tokens",
@@ -1632,7 +1640,7 @@ mod tests {
         // 都确定，顺带钉「版本并入 {agent} 值、用户模板无需新占位符」。
         let stdout = run_statusline(&p, "claude", &home, br#"{"version":"9.9.9"}"#);
         assert!(
-            stdout.contains("claude 9.9.9[unknown]"),
+            stdout.contains("claude-9.9.9[unknown]"),
             "user template wins: {stdout}"
         );
         assert!(
@@ -1671,7 +1679,7 @@ mod tests {
             br#"{"session_id":"s1","version":"9.9.9"}"#,
         );
         assert!(
-            out.contains("claude 9.9.9:working"),
+            out.contains("claude-9.9.9:working"),
             "session-keyed wins: {out}"
         );
         // 键文件缺位时回落 agent 最新键；session 不符的最新键被闸掉。
@@ -1683,7 +1691,7 @@ mod tests {
             br#"{"session_id":"s1","version":"9.9.9"}"#,
         );
         assert!(
-            out.contains("claude 9.9.9:unknown"),
+            out.contains("claude-9.9.9:unknown"),
             "mismatched latest must be gated: {out}"
         );
         // kimi camelCase sessionId 同样命中键路径。
@@ -1699,7 +1707,7 @@ mod tests {
             br#"{"sessionId":"k1","version":"9.9.9"}"#,
         );
         assert!(
-            out.contains("kimi 9.9.9:idle"),
+            out.contains("kimi-9.9.9:idle"),
             "camelCase sessionId hits keyed path: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -1794,7 +1802,7 @@ mod tests {
         // 带壳串：归一化提取裸版本。
         let out = run_statusline(&p, "grok", &home, br#"{"version":"1.0.30 (hash)"}"#);
         assert!(
-            out.contains("grok 1.0.30:unknown"),
+            out.contains("grok-1.0.30:unknown"),
             "shelled version normalizes to bare token: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -1834,7 +1842,7 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         let out = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
         assert!(
-            out.contains("claude 3.2.1:unknown"),
+            out.contains("claude-3.2.1:unknown"),
             "env-pinned binary is probed and versioned: {out}"
         );
         let ver_file = cache.join("agent-version-claude.json");
@@ -1850,7 +1858,7 @@ mod tests {
         // 第二跑：缓存命中路径，同判据稳定（三元组未变不重探）。
         let out2 = run_statusline_with(&p, "claude", &home, br#"{"session_id":"s1"}"#, &envs);
         assert!(
-            out2.contains("claude 3.2.1:unknown"),
+            out2.contains("claude-3.2.1:unknown"),
             "cache hit path renders identically: {out2}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -2256,7 +2264,7 @@ mod tests {
         // 二行 agent 状态：agent 态（D46 带版本形）加耗时；context 段百分比
         // 直跟 token 绝对值括号（FmtTok 1024 进位：200000/1024=195k、
         // 1000000/1024=977k）。
-        assert!(lines[1].contains("claude 2.1.270:unknown"), "{out}");
+        assert!(lines[1].contains("claude-2.1.270:unknown"), "{out}");
         assert!(
             lines[1].contains("20% [195k/977k]"),
             "D43 context shows absolute tokens, not mix: {out}"
@@ -2278,7 +2286,7 @@ mod tests {
             "kimi merges rows to one line: {out_kimi}"
         );
         assert!(
-            out_kimi.contains("kimi 2.1.270:unknown") && out_kimi.contains("195k/977k"),
+            out_kimi.contains("kimi-2.1.270:unknown") && out_kimi.contains("195k/977k"),
             "kimi single line keeps agent state and tokens: {out_kimi}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -2338,7 +2346,7 @@ mod tests {
         let stdin = br#"{"version":"9.9.9","context_window":{"context_window_size":1024,"used_percentage":50}}"#;
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, stdin);
-        assert!(out.contains("claude 9.9.9:unknown"), "{out}");
+        assert!(out.contains("claude-9.9.9:unknown"), "{out}");
         assert!(out.contains("512/1k"), "{out}");
         assert_eq!(
             out.lines().filter(|l| !l.trim().is_empty()).count(),
@@ -2374,7 +2382,7 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude 9.9.9:unknown") && out.contains("195k/977k"),
+            out.contains("claude-9.9.9:unknown") && out.contains("195k/977k"),
             "v1.1.0 dual-row config upgrades cleanly: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -2392,7 +2400,7 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude 9.9.9:unknown") && out.contains("20% [195k/977k]"),
+            out.contains("claude-9.9.9:unknown") && out.contains("20% [195k/977k]"),
             "D18 single-row full config upgrades cleanly (D43 context form): {out}"
         );
         assert_eq!(

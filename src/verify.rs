@@ -2,8 +2,8 @@
 //! 两层判据（S033 源码实证底座；D28 起注册面全量用户级）：
 //! - 状态栏：**验收已部署的面**（D37，2026-09-13 wsl 总台验收适配）：脚本
 //!   本体直跑（mock 空 JSON 喂 stdin，断言 stdout 任一行含 `agent:state`
-//!   机读标记（D42 三行布局起 agent 态在第二行；D46 起可带版本形
-//!   `agent <version>:state`），S025；脚本由 verify 按
+//!   机读标记（D42 三行布局起 agent 态在第二行；D46 起可带连字符版本形
+//!   `agent-<version>:state`），S025；脚本由 verify 按
 //!   需释放）；codex 无外部命令面（M045），断
 //!   `~/.codex/config.toml` 的 `[tui] status_line` 含内置项 ID。面未部署
 //!   （无 `[tui] status_line`）或可选运行时缺位（pwsh 不在 PATH）= skip
@@ -241,7 +241,7 @@ fn verify_statusline(agent: &str, home: &Path) -> LayerVerdict {
         LayerVerdict::Fail {
             reason: "marker-missing".into(),
             hint: Some(format!(
-                "状态栏脚本 stdout 应含机读标记 {agent}[ <version>]:<state>（S025；D42 起 agent 态在第二行，D46 起可带版本）"
+                "状态栏脚本 stdout 应含机读标记 {agent}[-<version>]:<state>（S025；D42 起 agent 态在第二行，D46 起可带连字符版本形）"
             )),
         }
     }
@@ -249,9 +249,10 @@ fn verify_statusline(agent: &str, home: &Path) -> LayerVerdict {
 
 /// 纯函数：stdout 任一行含机读标记，两形兼容（D42 三行布局起 agent 态
 /// 在第二行；D46 起版本并入 agent 名）。旧形 `<agent>:<state>`；新形
-/// `<agent> <version>:<state>`，版本 token 数字起头且含点（probe 正则与
-/// payload version 都至少一段 `.N`；点门槛同时压「claude 2026:」类无点
-/// 数字误报）。探不到版本时脚本回落旧形，两形都必须过。
+/// `<agent>-<version>:<state>`（用户裁连字符拼接），版本 token 数字起头
+/// 且含点（probe 正则与 payload version 都至少一段 `.N`；点门槛同时压
+/// 「claude-2026:」类无点数字误报）。探不到版本时脚本回落旧形，两形都
+/// 必须过。
 pub fn statusline_marker_ok(agent: &str, stdout: &str) -> bool {
     // D42 三行布局：agent 态在第二行（一行 = 项目状态），机读标记从
     // 「首行含」放宽为「任一行含」（消费面 = verify 与 grep，S025 契约
@@ -260,7 +261,7 @@ pub fn statusline_marker_ok(agent: &str, stdout: &str) -> bool {
 }
 
 /// 单行标记判据：行内找 `<agent>` 出现位，其后直跟 `:`（旧形），或跟
-/// ` <version>:`（D46 新形，版本后必须收在 `:`）。
+/// `-<version>:`（D46 新形，版本后必须收在 `:`）。
 fn marker_line_hit(agent: &str, line: &str) -> bool {
     let mut from = 0;
     while let Some(pos) = line[from..].find(agent) {
@@ -268,7 +269,7 @@ fn marker_line_hit(agent: &str, line: &str) -> bool {
         if rest.starts_with(':') {
             return true;
         }
-        if let Some(r) = rest.strip_prefix(' ') {
+        if let Some(r) = rest.strip_prefix('-') {
             let tok = r.split([':', ' ']).next().unwrap_or("");
             if tok.starts_with(|c: char| c.is_ascii_digit())
                 && tok.contains('.')
@@ -858,25 +859,30 @@ mod tests {
 
     #[test]
     fn d46_marker_accepts_versioned_form_and_rejects_lookalikes() {
-        // D46 新形：`<agent> <version>:<state>`（版本 token 数字起头且含点，
-        // 与脚本归一化同源）。负例压无点数字、非数字起头、缺冒号三族。
+        // D46 新形（用户裁连字符拼接）：`<agent>-<version>:<state>`，版本
+        // token 数字起头且含点，与脚本归一化同源。负例压空格分隔、无点
+        // 数字、非数字起头、缺冒号四族。
         assert!(statusline_marker_ok(
             "claude",
-            "\u{1b}[38;5;179mclaude 2.1.270:working\u{1b}[0m | x"
+            "\u{1b}[38;5;179mclaude-2.1.268:working\u{1b}[0m | x"
         ));
-        assert!(statusline_marker_ok("kimi", "kimi 1.2.3-beta.1:idle\n"));
-        assert!(statusline_marker_ok("grok", "grok 1.0.30:unknown"));
-        assert!(!statusline_marker_ok("claude", "claude 2026:x"), "no dot");
+        assert!(statusline_marker_ok("kimi", "kimi-1.2.3-beta.1:idle\n"));
+        assert!(statusline_marker_ok("grok", "grok-1.0.30:unknown"));
         assert!(
-            !statusline_marker_ok("claude", "claude v2.1:working"),
+            !statusline_marker_ok("claude", "claude 2.1.268:working"),
+            "space form is not the canonical separator"
+        );
+        assert!(!statusline_marker_ok("claude", "claude-2026:x"), "no dot");
+        assert!(
+            !statusline_marker_ok("claude", "claude-v2.1:working"),
             "version token must start with a digit"
         );
         assert!(
-            !statusline_marker_ok("claude", "claude 2.1 working"),
+            !statusline_marker_ok("claude", "claude-2.1 working"),
             "colon terminator required"
         );
         // 同名前缀不吃误报：`claudex` 行不判成 `claude` 命中。
-        assert!(!statusline_marker_ok("claude", "claudex 2.1.0:working"));
+        assert!(!statusline_marker_ok("claude", "claudex-2.1.0:working"));
     }
 
     #[test]

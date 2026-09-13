@@ -6,14 +6,14 @@
 
 D46 状态栏 agent 版本段（2026-09-13 立项，v1.1.4 方向）：
 
-- [ ] 版本段实现（src\statusline.rs：SEG_OMA 两级版本获取、mtime 键控 probe 加 5 分钟失败静默窗、`~/.hst/cache/agent-version-<agent>.json` 单文件缓存、HST_VER_CACHE_DIR 覆盖、版本并入 `{agent}` 值模板零变化、$agent 本体不动）
-- [ ] 机读标记与 codex 面（src\verify.rs marker 判据两形兼容；CODEX_STATUS_LINE_ITEMS 加 codex-version 变十三项）
-- [ ] 测试与门禁（单测加集成：stdin version 出新形、无版本回落旧形、probe 路径隔离真跑；全量加 fmt/clippy 加 rumdl 加 .tools 三扫描）
-- [ ] 文档同步（R002 状态栏与 verify 行、S025 标记契约 D46 修订、S034 追记、INDEX、CHANGELOG）
-- [ ] herdr 右侧 codex 两轮 review 达成一致（设计轮已发；diff 轮随实现后；用户令）
-- [ ] 发版 v1.1.4（tag、CI 绿、镜像 hst/stable 滚动 digest 三方对账、本机换装重跑 hst statusline 实弹、herdr 回执 ohmycloud 含 S025 标记形变知会）
+- [x] 版本段实现（src\statusline.rs：SEG_OMA 两级版本获取、mtime 键控 probe 加 5 分钟失败静默窗、`~/.hst/cache/agent-version-<agent>.json` 单文件缓存、HST_VER_CACHE_DIR 覆盖、版本并入 `{agent}` 值模板零变化、$agent 本体不动）
+- [x] 机读标记与 codex 面（src\verify.rs marker 判据两形兼容；CODEX_STATUS_LINE_ITEMS 加 codex-version 变十三项）
+- [x] 测试与门禁（174 单测加 28 集成绿；fmt/clippy 净增零；rumdl 加 .tools 三扫描全绿）
+- [x] 文档同步（R002 状态栏与 verify 与 hook 行、S025 标记契约 D46 修订、S034 D46 追记、R001 cache 登记、INDEX、CHANGELOG v1.1.4）
+- [ ] herdr 右侧 codex 两轮 review 达成一致（设计轮 F1 至 F8 已全收口；diff 轮对 be284dc 进行中；用户令）
+- [ ] 发版 v1.1.4（tag、CI 绿、镜像 hst/stable 滚动 digest 三方对账、herdr 回执 ohmycloud 含 S025 标记形变知会）
 - [ ] wsl 总台 verify G8 面复验随新版（对端动作，回执后关账）
-- [ ] 收口（TODO 清账、GOAL 历史、diary）
+- [ ] 收口（TODO 清账、GOAL 历史、diary 追记）
 
 D31 至 D45 前目标（2026-09-13 ohmycloud 协调批与状态栏 HUD 迭代五连发，v1.0.0 至 v1.1.3；G2 补钉一行除外，见队列）：清单见 git 历史。
 

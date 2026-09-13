@@ -64,9 +64,9 @@
 
 ## D46 落地追记：agent 版本段
 
-> 2026-09-13，v1.1.4 方向；用户裁数据源两级（stdin version 直用，否则本地 probe 加缓存）。
+> 2026-09-13，v1.1.4 方向；用户裁数据源两级（stdin version 直用，否则本地 probe 加缓存），第 2 轮裁连字符形与 codex 面 context 项精简。
 
-- **codex 内置项实证**：`StatusLineItem::CodexVersion` 存在（`status_line_setup.rs` 底部 `bottom_pane/` 路径，枚举 doc 注释 "Codex application version"），strum `serialize_all = "kebab_case"` 序列化即配置 ID `codex-version`；herdr 右侧 codex 评审在本机 codex v0.154.0 二进制内复核 `codex-version` 与 `CodexVersion` 各 3 处 [实证: openai/codex 源码 + 本机二进制 rg 2026-09-13]。D46 缺省集升十三项（run-state 后插 codex-version），codex 侧版本走自家内置项，与 pwsh 面（版本并入 agent 名）是**两套机制**。
+- **codex 内置项实证**：`StatusLineItem::CodexVersion` 存在（`status_line_setup.rs` 底部 `bottom_pane/` 路径，枚举 doc 注释 "Codex application version"），strum `serialize_all = "kebab_case"` 序列化即配置 ID `codex-version`；herdr 右侧 codex 评审在本机 codex v0.154.0 二进制内复核 `codex-version` 与 `CodexVersion` 各 3 处 [实证: openai/codex 源码 + 本机二进制 rg 2026-09-13]。D46 缺省集 run-state 后插 codex-version；同轮用户实弹观察 codex 栏 context 项「used 加 left」重复占宽，裁去 `context-remaining`（只留 `Context N% used`），缺省集回十二项。codex 侧版本走自家内置项，与 pwsh 面（版本并入 agent 名）是**两套机制**。
 - **stdin payload version 三家实证**（herdr codex 设计轮取证）：claude 二进制内 JSON 构造 `version: {...VERSION:"2.1.268"...}.VERSION` 裸串；kimi 二进制 `statusLinePayload(){ ... version: state.version }` 裸值；grok 到文档级（字段表 `version | Grok release, for display`），带壳可能未除，故 D46 实现对 payload 值与 probe 输出套同一条归一化（`数字.数字` 起头 token），带壳与 nightly 都安全 [实证: kimi/grok/claude 本机二进制取证 2026-09-13；grok 真值待 wsl 总台 G8 复验回填]。
-- **机读标记形变**：`agent:state` 可带版本成 `agent <version>:state`（S025 规范语法与消费方清单）；verify 判据两形兼容，herdr 消费面随 v1.1.4 回执知会。
+- **机读标记形变**：`agent:state` 可带版本成 `agent-<version>:state`（连字符拼接，第 2 轮用户裁；S025 规范语法与消费方清单）；verify 判据两形兼容，herdr 消费面随 v1.1.4 回执知会。
 - **探针缓存坑（本机实弹）**：pwsh 7 `ConvertFrom-Json` 把 ISO 日期串自动转 `[DateTime]`（文化格式化后与 'o' 串永不相等），缓存键 mtime/probed_at 改记 ticks 整数串免疫。
