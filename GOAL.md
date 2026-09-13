@@ -22,6 +22,7 @@
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-13 | **v1.0.1 宿主终验闭环**：宿主装新版重跑 init，settings.json 八事件全收敛单条 ps1 正形态（裸 cmd 零残留），hook 经 sh 终弹 rc=0，宿主回执「hook 形态线全链闭环」。镜像 hst/stable 与 oma/stable 随 tag 到货（win 主资产 digest 三方对账全等 b884da426587）；herdr 知会 ohmycloud（版本加六资产 sha256） |
 | 2026-09-13 | **v1.0.1 发版**（宿主终验驱动：宿主二进制停 v1.0.0 无清扫逻辑，重跑旧 init 又落直路径行双注册，再手清止痛；宿主依赖新版二进制做单条正形态终验）：tag 打在评审零异议的 `157ed99`，CHANGELOG 1.0.1 里程碑收 D37 至 D39 适配批 |
 | 2026-09-13 | **D39 Windows hook 注册 sh 兼容形态（两轮收口）**：第 1 轮取证 M062（直路径在 WSL 形 sh 不认盘符、`cmd.exe /c` 在 Git Bash 被 MSYS 吃 `/c`、`//c` 在 PS 进交互态，三种前缀无跨 sh 通吃解；来函建议的字面 cmd.exe /c 形态在本机有失败实证），终态取 `powershell -NoProfile -ExecutionPolicy Bypass -File <hst-state.ps1> <agent>` 加新增 ps1 版状态 shim，三面统一、grok 不动、存量幂等覆盖；三 shell 实弹 rc=0 加落盘、live verify 四家绿。第 2 轮（宿主终验回执 ps1 桥生效）补幂等漏：is_ours 按 stem 认解释器头（含全路径头）加非管理事件清扫（M063），166 单测加 27 集成绿。同函对端回执：wsl 总台 37 项验收全绿、d77a3fc 已收 |
 | 2026-09-13 | **D37 加 D38 总台 I3 适配（三轮到点）**：D37 verify 状态栏层改「验收已部署的面」（`[tui] status_line` 未部署或 pwsh 缺 PATH = skip 带 CTA，断链仍 fail）；D38 grok hook 层红（CLI 已装无凭据，无头会话先鉴权后触发 hook）第 1 轮登录文件闸门误放行（凭据在场但不可用），第 2 轮按令拆闸门改结果容错：grok/kimi 跑一次不押断言、hook 层 ok 才计数、不成打 skip 带首条 reason，claude/codex 硬断言保持，产品 verify 面不动（如实 fail 修环境归操作员），R004 三.6 口径随批；162 单测加 27 集成绿含本机四家活体 |
