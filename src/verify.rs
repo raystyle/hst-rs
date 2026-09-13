@@ -1,8 +1,9 @@
 //! `hst agents verify`（D17）：四家 agent 的 hook 与状态栏全平台无头验收。
 //! 两层判据（S033 源码实证底座；D28 起注册面全量用户级）：
 //! - 状态栏：**验收已部署的面**（D37，2026-09-13 wsl 总台验收适配）：脚本
-//!   本体直跑（mock 空 JSON 喂 stdin，断言 stdout 首行 `agent:state` 机读
-//!   标记，S025；脚本由 verify 按需释放）；codex 无外部命令面（M045），断
+//!   本体直跑（mock 空 JSON 喂 stdin，断言 stdout 任一行含 `agent:state`
+//!   机读标记（D41 三行布局起 agent 态在第二行），S025；脚本由 verify 按
+//!   需释放）；codex 无外部命令面（M045），断
 //!   `~/.codex/config.toml` 的 `[tui] status_line` 含内置项 ID。面未部署
 //!   （无 `[tui] status_line`）或可选运行时缺位（pwsh 不在 PATH）= skip
 //!   不计败、带 CTA（状态栏是可选面，doctor 另有 warn）；已部署但断链
@@ -228,16 +229,20 @@ fn verify_statusline(agent: &str, home: &Path) -> LayerVerdict {
         LayerVerdict::Fail {
             reason: "marker-missing".into(),
             hint: Some(format!(
-                "状态栏脚本 stdout 首行应含机读标记 {agent}:<state>（S025）"
+                "状态栏脚本 stdout 应含机读标记 {agent}:<state>（S025；D41 三行布局起 agent 态在第二行）"
             )),
         }
     }
 }
 
-/// 纯函数：stdout 首行含 `<agent>:` 机读标记（脚本输出形如 agent:state）。
+/// 纯函数：stdout 任一行含 `<agent>:` 机读标记（D41 三行布局起 agent 态
+/// 在第二行）。
 pub fn statusline_marker_ok(agent: &str, stdout: &str) -> bool {
     let marker = format!("{agent}:");
-    stdout.lines().next().is_some_and(|l| l.contains(&marker))
+    // D41 三行布局：agent 态在第二行（一行 = 项目状态），机读标记从
+    // 「首行含」放宽为「任一行含」（消费面 = verify 与 grep，S025 契约
+    // 随布局修订；kimi / grok 运行时并单行不受影响）。
+    stdout.lines().any(|l| l.contains(&marker))
 }
 
 /// codex：`[tui] status_line` 含内置项 ID 即 Builtin；键未部署 = Skip（D37，
@@ -797,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    fn statusline_marker_must_be_on_first_line_with_agent_prefix() {
+    fn statusline_marker_may_be_on_any_line_with_agent_prefix() {
         assert!(statusline_marker_ok("claude", "claude:idle | ~/proj\n"));
         // ANSI 色码包裹下标记仍在行内（脚本 Seg 输出）。
         assert!(statusline_marker_ok(
@@ -806,8 +811,12 @@ mod tests {
         ));
         assert!(!statusline_marker_ok("kimi", "claude:idle"));
         assert!(!statusline_marker_ok("kimi", ""));
-        // 标记必须在首行：第二行出现不算。
-        assert!(!statusline_marker_ok("kimi", "garbage\nkimi:idle"));
+        // D41 三行布局：agent 态在第二行，任一行命中即算（一行 = 项目
+        // 状态、二行 = agent 状态、三行 = 运行时状态）。
+        assert!(statusline_marker_ok(
+            "kimi",
+            "bash | /p | main\nkimi:idle\n3 | 2"
+        ));
     }
 
     #[test]

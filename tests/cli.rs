@@ -742,9 +742,10 @@ fn statusline_example_prints_customization_template() {
         .stdout(contains("~/.hst/statusline.toml"))
         .stdout(contains("segments = "))
         .stdout(contains("segments2 = "))
+        .stdout(contains("segments3 = "))
         .stdout(contains("single_line"))
         .stdout(contains("tools / mcp / tokens"))
-        .stdout(contains("rust / node / zig / go / cpp"));
+        .stdout(contains("node / zig / go / cpp"));
 }
 
 #[test]
