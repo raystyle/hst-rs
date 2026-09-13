@@ -21,7 +21,7 @@ D31 至 D35 ohmycloud 协调批（2026-09-13 当日闭环归档 P0048，v1.0.0 �
 - [x] D39 Windows hook 注册 sh 兼容形态（第 1 轮 ps1 桥加 M062；第 2 轮幂等漏清扫加 M063；第 3、4 轮 codex review F/G/H 系全收零异议；宿主 v1.0.0 旧二进制复踩双注册后发 v1.0.1 滚 stable）
 - [x] D40 状态栏双排与三要素（v1.1.0 已发：tag 424ff92，codex 三轮零异议，镜像双段到货 digest 全等 e8a9effeb3c2，herdr 已知会；wsl 总台 verify G8 复验随新版）
 - [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞；D42 三行测试已顺带钉 kimi 并一行，剩 grok）
-- [ ] D42 状态栏三行重分组：实现与测试全绿，待 codex 评审闸门后发 v1.1.1 滚 stable
+- [x] D42 状态栏三行重分组（v1.1.1 已发：tag 3cfd31a，codex 三轮零异议，镜像双段到货 digest 全等 edfd970c8635，herdr 已知会）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 
