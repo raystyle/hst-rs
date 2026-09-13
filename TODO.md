@@ -67,7 +67,7 @@ D28 前目标（2026-09-11 四轮裁定当日闭环归档 P0045，v0.5.4 发版�
 
 | 目标 | 状态 | 说明 |
 | --- | --- | --- |
-| serde 加 validator 加 toml 配置校验选型入档 | 排队 | 用户 2026-09-13 递材（serde 1 加 validator 0.21 derive 两步校验、toml 1.1 同模型复用、axum-valid Valid 集成、领域层 TryFrom 收口）；候选落 R 系列（R005 家族），适用面 = hst 的 TOML/JSON 配置解析重构候选（statusline.toml 手写 Value 遍历、yolo/doctor 判据面）；随下批立项时澄清范围 |
+| serde 加 validator 加 toml 配置校验选型入档 | 排队 | 用户 2026-09-13 递材并裁「随下批立项」（serde 1 加 validator 0.21 derive 两步校验、toml 1.1 同模型复用、axum-valid Valid 集成、领域层 TryFrom 收口）；候选落 R 系列（R005 家族），适用面 = hst 的 TOML/JSON 配置解析重构候选（statusline.toml 手写 Value 遍历、yolo/doctor 判据面）；立项时走 PRD 澄清范围 |
 | wsl 与 Windows config 平移键路径归一 | 排队 | 用户口径（2026-09-13 D39 来函）：wsl 是真 Linux 内核带 `/mnt/c` 邻接，配置在两端平移时项目键路径（如 codex `[projects]`、claude `projects.<abs>`）需归一处理，P0048 D39 节记档；触发面出现时立项 |
 | D36 状态栏 HUD 簇 | 排队 | 研究先行已落 S034（流行 HUD 盘点、官方 stdin JSON 契约、多行与 MCP/tools 计数缺口）；设计追问链待启（段取舍、比例口径、多行断行、四家兼容面），随后立项 |
 | M060 两笔加 ome 更名尾巴随下个功能版发 | 完成 | M060 两笔（guard 透传白名单化加 shebang 注入缝）随 v0.6.0 tag 发出；ome 改 ark hint 串（shim warn 加 agents hint 已先行为 ark，注释尾巴随批）随 v0.6.1 清讫关账 |
