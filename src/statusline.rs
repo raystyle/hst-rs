@@ -271,9 +271,10 @@ if ($tp -and (Test-Path $tp)) {
 }
 "#;
 
-/// tools 段：本会话工具调用计数（transcript tool_use 出现次数）。
+/// tools 段：工具调用计数（transcript 尾 500 行 tool_use 出现次数；近似
+/// 口径，长会话低估——与 R002 同口径）。
 const SEG_TOOLS: &str = r#"
-# ── 工具计数： N（本会话 tool_use 次数，无 transcript 省略）──
+# ── 工具计数： N（transcript 尾 500 行 tool_use 次数，近似口径）──
 if ($null -ne $toolCalls) {
     $tTxt = ApplyFmt (Tmpl 'tools') @{ icon = (Ico 'tools'); count = [string]$toolCalls }
     $t = Seg $tTxt '38;5;215'
@@ -590,8 +591,9 @@ const PS1_TAIL: &str = "\nWrite-Output ($parts -join ' | ')\nexit 0\n";
 const PS1_ROWSPLIT: &str =
     "\n$slRow1 = ($parts -join ' | ')\n$parts = [System.Collections.Generic.List[string]]::new()\n";
 
-const PS1_TAIL2: &str =
-    "\n$slRow2 = ($parts -join ' | ')\nWrite-Output $slRow1\nWrite-Output $slRow2\nexit 0\n";
+const PS1_TAIL2: &str = "\n$slRow2 = ($parts -join ' | ')\n# codex review F2/F3：kimi 只取首行（S025 源码实证）加 grok 多行未实证，
+# 运行时自动退单排（两排并一行，保包版本与工具链段可见性）；空排不出空行。
+if ($AgentName -eq 'kimi' -or $AgentName -eq 'grok') {\n    $slAll = @($slRow1, $slRow2) | Where-Object { $_ }\n    Write-Output ($slAll -join ' | ')\n} else {\n    if ($slRow1) { Write-Output $slRow1 }\n    if ($slRow2) { Write-Output $slRow2 }\n}\nexit 0\n";
 
 /// 段 id 到脚本块查表。未知 id 报错：拼装无法命中段块。
 fn segment_block(id: &str) -> Result<&'static str, String> {
@@ -1125,7 +1127,7 @@ pub const EXAMPLE_TOML: &str = r#"# ~/.hst/statusline.toml —— 状态栏用�
 # 段落清单（D40 双排）：segments = 第一排、segments2 = 第二排，段 id 数组
 # 即全量（显隐加顺序）。缺省第一排 = shell / dir / oma / model / context /
 # git；缺省第二排 = tools / mcp / tokens / duration / package / python /
-# rust / node / zig / go / cpp。可用段 id 加：tools / mcp / tokens。
+# rust / node / zig / go / cpp。可用段 id：加 tools / mcp / tokens 三新段。
 # 例（隐藏 shell 与时长段、git 提到目录前）：
 #   segments = ["dir", "git", "oma", "model", "context"]
 #   segments2 = ["tools", "mcp", "tokens", "package"]

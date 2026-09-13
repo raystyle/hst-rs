@@ -734,13 +734,17 @@ fn dies_statusline_unknown_agent() {
 #[test]
 fn statusline_example_prints_customization_template() {
     // D18: --example 打印带注释模板后干净退出，不碰任何配置面。
+    // D40：模板改双排面（segments / segments2 / single_line 三键）。
     oma()
         .args(["agents", "statusline", "--example"])
         .assert()
         .success()
         .stdout(contains("~/.hst/statusline.toml"))
         .stdout(contains("segments = "))
-        .stdout(contains("python / rust / node / zig / go / cpp"));
+        .stdout(contains("segments2 = "))
+        .stdout(contains("single_line"))
+        .stdout(contains("tools / mcp / tokens"))
+        .stdout(contains("rust / node / zig / go / cpp"));
 }
 
 #[test]
