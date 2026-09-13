@@ -1310,7 +1310,7 @@ fn strip_tui_section(text: &str) -> String {
 
 /// Codex: replace the `[tui]` table with built-in item IDs (ohmypwsh S016).
 /// Does not deploy the pwsh script; Codex has no command-backed status line.
-/// `[codex] items`（D18）用户清单原样透传：codex 对未知 id 静默跳过，oma
+/// `[codex] items`（D18）用户清单原样透传：codex 对未知 id 静默跳过，hst
 /// 不校验清单合法性；键缺省回落内嵌推荐八项。
 pub fn merge_codex(home: &Path) -> Result<String, String> {
     let cfg = read_config(home)?;

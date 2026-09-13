@@ -42,9 +42,9 @@ esearch\S006-信任阻塞门-四家种类与官方口径.md` 2026-08-31 裁决�
 
 ## 四、hook 与状态通道
 
-> `oma hook` 怎么接
+> `oma hook` 怎么接（历史口径：spawn 纪元，D15 已去编排）
 
-1. spawn 注入 `OHMYAGENTS_PROJECT` / `OHMYAGENTS_AGENT` / `OHMYAGENTS_STATE_FILE`；各家项目 hook 的 `command` 调 `oma hook`（stdin 事件 JSON 或 `oma hook blocked`）。[实证: poc-dialogs]
+1. 历史口径（spawn 纪元，D15 已去编排）：spawn 注入 `OHMYAGENTS_PROJECT` / `OHMYAGENTS_AGENT` / `OHMYAGENTS_STATE_FILE`；各家项目 hook 的 `command` 调 `oma hook`（stdin 事件 JSON 或 `oma hook blocked`）。[实证: poc-dialogs] 现行契约（D28/D45）：注册指向用户级自包含 shim（`~/.hst/hooks/hst-state.*`，首参 agent 名），env 覆盖名 `HST_PROJECT` / `HST_AGENT` / `HST_STATE_FILE`，手动入口 `hst hook status --agent <名>`。
 2. hook 缺环境变量或项目对不上 **exit 0**（安全带：用户级误装也不污染别的仓库）；不连 rmux 管道。（依据 `docs
 esearch\S008-项目级hook与skill.md` 安全带节）
 3. 事件映射四态：idle（SessionStart/Stop/Interrupt/SessionEnd）、working（UserPromptSubmit/Pre/PostToolUse 等）、blocked（PermissionRequest，Codex/Kimi）、unknown（Notification，**不映 idle**）。事件名双形态归一。[经验: evo-harness STATE_MAP]

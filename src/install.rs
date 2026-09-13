@@ -8,6 +8,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const UA: &str = concat!("hst/", env!("CARGO_PKG_VERSION"));
+/// 磁盘上的存量 manifest 名（oma 纪元落的名字）：**活的磁盘协议**，agents
+/// 探测据此认定 hst 自管根里的存量安装（source=hst 面），改名会断存量识
+/// 别；D45 oma 遗产清扫显式保留（与技能名 ohmyagents、doctor 的 oma-state
+/// 历史识别同列不做清单）。
 const MANIFEST_NAME: &str = ".oma-agent-manifest.toml";
 
 // ---- 根解析 ----

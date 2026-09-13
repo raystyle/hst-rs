@@ -5,14 +5,14 @@
 //! 状态落 `~/.hst/state/` 按 session 分键（D28，防 herdr 多会话互踩）：
 //! 默认双写 `<agent>.json`（agent 最新，供无 session 标识的消费面）加
 //! `<agent>-<session>.json`（session 键，状态栏按当前会话直读）；
-//! SessionEnd 删本 session 键文件（GC，崩溃残留由 oma hook 侧陈旧清扫）。
+//! SessionEnd 删本 session 键文件（GC，崩溃残留由 hst hook 侧陈旧清扫）。
 //! `HST_STATE_FILE` 覆盖优先且互斥（单文件语义，verify 与测试用）。
 //! secretguard 由 shim fail-open 委托加 M060a 白名单：PreToolUse /
 //! UserPromptSubmit 时 oma 在位则转发 payload，仅「exit 2 且 stderr 带
 //! `hst secretguard:` 前缀」判定为自判 block 透传 2 并回放原因；oma 故障
 //! 的其余非零（升级期坏二进制、CLI 契约漂移含 clap 用法错的 exit 2）一律
 //! fail-open 放行，不在位同放行（state 已写）——护无痛轮换。
-//! `oma hook` 保留为手动入口与委托目标（含完整 notification 形状解析）。
+//! `hst hook` 保留为手动入口与委托目标（含完整 notification 形状解析）。
 //! cmd 形态两级（用户裁 2026-09-10：jq 归 ome 部署，shim 部署前探 PATH）：
 //! jq 在位用 jq 解析（转义免疫、ts 取 jq now），缺位回落 findstr 硬解析并
 //! warn 指向 `ark install jq`（ome 更名 Ark 随批）。sh 侧 sed 是 POSIX 基线不引依赖。
@@ -254,7 +254,7 @@ case "$event" in
       # M060a guard 透传白名单：仅「oma 自判 block」（exit 2 且 stderr 带
       # hst secretguard: 前缀）才透传 2 并回放原因；oma 故障的非零一律
       # fail-open 放行，护无痛轮换。
-      errf="$(mktemp "${TMPDIR:-/tmp}/oma-guard.XXXXXX" 2>/dev/null || printf '%s/oma-guard.%s' "${TMPDIR:-/tmp}" "$$")"
+      errf="$(mktemp "${TMPDIR:-/tmp}/hst-guard.XXXXXX" 2>/dev/null || printf '%s/hst-guard.%s' "${TMPDIR:-/tmp}" "$$")"
       printf '%s' "$payload" | hst hook status --agent "$agent" 2>"$errf"
       rc=$?
       if [ "$rc" -eq 2 ] && grep -q "^hst secretguard:" "$errf"; then
@@ -417,19 +417,19 @@ pub fn host_shell() -> &'static str {
 /// 用户裁定：jq 归 ome 部署，部署前探 PATH；缺位回落 findstr 版并 warn）。
 /// 返回 (实写路径, 警告)。
 pub fn deploy_shims(
-    oma_root: &std::path::Path,
+    root_param: &std::path::Path,
 ) -> Result<(Vec<std::path::PathBuf>, Vec<String>), String> {
-    deploy_shims_with(oma_root, host_shell())
+    deploy_shims_with(root_param, host_shell())
 }
 
 /// Test seam（M060b）：shell 选择注入（zsh 变体在 Windows/WSL 编译期
 /// cfg! 分支测不到的根因消除；prod 经 deploy_shims 走 host_shell）。
 pub fn deploy_shims_with(
-    oma_root: &std::path::Path,
+    root_param: &std::path::Path,
     shell: &str,
 ) -> Result<(Vec<std::path::PathBuf>, Vec<String>), String> {
     use std::path::PathBuf;
-    let dir = oma_root.join("hooks");
+    let dir = root_param.join("hooks");
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let mut wrote: Vec<PathBuf> = Vec::new();
     let mut warns = Vec::new();
