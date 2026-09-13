@@ -735,6 +735,7 @@ fn dies_statusline_unknown_agent() {
 fn statusline_example_prints_customization_template() {
     // D18: --example 打印带注释模板后干净退出，不碰任何配置面。
     // D40：模板改双排面（segments / segments2 / single_line 三键）。
+    // D43：三行精修（一行 dir/git、context 带 token 绝对值）。
     oma()
         .args(["agents", "statusline", "--example"])
         .assert()
@@ -745,7 +746,7 @@ fn statusline_example_prints_customization_template() {
         .stdout(contains("segments3 = "))
         .stdout(contains("single_line"))
         .stdout(contains("tools / mcp / tokens"))
-        .stdout(contains("node / zig / go / cpp"));
+        .stdout(contains("rust / node / ts / zig / go / cpp"));
 }
 
 #[test]

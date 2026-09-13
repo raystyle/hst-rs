@@ -317,7 +317,8 @@ if ($mcpCount) {
 }
 "#;
 
-/// tokens 段：token 用量绝对值（已用/窗口；D40 双排布局第二排）。
+/// tokens 段：token 用量绝对值（已用/窗口；D40 入默认行、D43 起退出默认
+/// 行改为显式选用，token 绝对值缺省并入 context 段括号）。
 const SEG_TOKENS: &str = r#"
 # ── Token 用量：N/M（已用/窗口绝对值）──
 if ($d.context_window) {
@@ -632,19 +633,19 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
     })
 }
 
-/// 默认第一行「项目状态」（D42 用户裁定三行定名）：shell / cwd / git 分支。
-/// D18 定制面 `segments` 键缺省回落此序。
-pub(crate) const DEFAULT_SEGMENTS: &[&str] = &["shell", "dir", "git"];
+/// 默认第一行「项目状态」（D43 用户精修五点）：cwd / git 分支（shell 移
+/// 三行）。D18 定制面 `segments` 键缺省回落此序。
+pub(crate) const DEFAULT_SEGMENTS: &[&str] = &["dir", "git"];
 
-/// 默认第二行「agent 状态」（D42）：agent 态 / 模型 / context 构成与
-/// 百分比。`segments2` 键缺省回落此序。
-pub(crate) const DEFAULT_SEGMENTS2: &[&str] = &["oma", "model", "context"];
+/// 默认第二行「agent 状态」（D43）：agent 态 / 模型 / context 百分比加
+/// token 绝对值（`46% [449k/977k]` 形，构成 mix 退位）/ 耗时。`segments2`
+/// 键缺省回落此序。
+pub(crate) const DEFAULT_SEGMENTS2: &[&str] = &["oma", "model", "context", "duration"];
 
-/// 默认第三行「运行时状态」（D42 用户补名）：tools 计数 / mcp 计数 /
-/// token 用量 / 耗时，加包版本与工具链段尾巴。`segments3` 键缺省回落
-/// 此序。
+/// 默认第三行「运行时状态」（D43）：shell / tools 计数 / mcp 计数，加包
+/// 版本与工具链段尾巴。`segments3` 键缺省回落此序。
 pub(crate) const DEFAULT_SEGMENTS3: &[&str] = &[
-    "tools", "mcp", "tokens", "duration", "package", "python", "rust", "node", "zig", "go", "cpp",
+    "shell", "tools", "mcp", "package", "python", "rust", "node", "zig", "go", "cpp",
 ];
 
 /// 内嵌默认模板（D18）。键 = 段 id；`context-ascii` 是 grok 的结构差异项
@@ -655,8 +656,8 @@ const DEFAULT_TEMPLATES: &[(&str, &str)] = &[
     ("dir", "{path}"),
     ("oma", "{icon}{agent}:{state}"),
     ("model", "{icon}{model}"),
-    ("context", "{icon}{pct}%{mix}"),
-    ("context-ascii", "{pct}% ctx{mix}"),
+    ("context", "{icon}{pct}% [{used}/{window}]"),
+    ("context-ascii", "{pct}% [{used}/{window}]"),
     ("tools", "{icon}{count}"),
     ("tools-ascii", "{count}"),
     ("mcp", "{icon}{count}"),
@@ -1172,21 +1173,20 @@ pub const EXAMPLE_TOML: &str = r#"# ~/.hst/statusline.toml —— 状态栏用�
 # 改完本文件重跑一次 oma agents statusline 生效。
 # 键级缺省回落：没写的键用内嵌默认；坏文件硬错退出 1。
 
-# 段落清单（D42 三行定名：项目状态 / agent 状态 / 运行时状态）：
-# segments = 第一行项目状态、segments2 = 第二行 agent 状态、
-# segments3 = 第三行运行时状态，段 id 数组即全量（显隐加顺序）。
-# 缺省第一行 = shell / dir / git；缺省第二行 = oma / model / context；
-# 缺省第三行 = tools / mcp / tokens / duration / package / python / rust
-# / node / zig / go / cpp。可用段 id：加 tools / mcp / tokens 三新段。
+# 段落清单（D43 用户精修五点后的三行定名）：
+# segments = 第一行项目状态（cwd / git 分支）、segments2 = 第二行 agent
+# 状态（agent 态 / 模型 / context 百分比加 token 绝对值 / 耗时）、
+# segments3 = 第三行运行时状态（shell / tools / mcp 加包与工具链尾巴），
+# 段 id 数组即全量（显隐加顺序）。可用段 id：tools / mcp / tokens 三新段。
 # 例（隐藏 shell 与时长段、git 提到目录前）：
 #   segments = ["dir", "git"]
 #   segments2 = ["oma", "model", "context"]
-#   segments3 = ["tools", "mcp", "tokens", "package"]
+#   segments3 = ["tools", "mcp", "package"]
 # 退单行（kimi / grok 运行时自动并一行；显式退单行用）：
 #   single_line = true
-segments = ["shell", "dir", "git"]
-segments2 = ["oma", "model", "context"]
-segments3 = ["tools", "mcp", "tokens", "duration", "package", "python", "rust", "node", "zig", "go", "cpp"]
+segments = ["dir", "git"]
+segments2 = ["oma", "model", "context", "duration"]
+segments3 = ["shell", "tools", "mcp", "package", "python", "rust", "node", "zig", "go", "cpp"]
 
 # 段内模板（[template]）：每段一条格式串；`<段>-ascii` 是 grok 的 ASCII 形
 #（缺省同用 nerd 模板、图标恒空）。可用占位符：
@@ -1727,24 +1727,24 @@ mod tests {
 
     #[test]
     fn assemble_keeps_default_segment_order() {
-        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D42 三行：
-        // 一行项目状态（shell/dir/git），二行 agent 状态（oma/model/
-        // context），三行运行时状态（tools/mcp/tokens/duration 加尾巴）。
+        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D43 精修后
+        // 三行：一行项目状态（dir/git），二行 agent 状态（oma/model/
+        // context/duration），三行运行时状态（shell/tools/mcp 加尾巴）；
+        // tokens 段退出默认行（token 绝对值并入 context 括号）。
         let ps1 = default_statusline_ps1();
         let mut last = 0usize;
         for marker in [
-            "# ── Shell 段",
             "# ── 目录：",
             "# ── Git：",
             "$slRow1 = ($parts -join ' | ')",
             "# ── oma 段",
             "# ── 模型（",
             "# ── 上下文：",
+            "# ── 会话累计：",
             "$slRow2 = ($parts -join ' | ')",
+            "# ── Shell 段",
             "# ── 工具计数：",
             "# ── MCP 计数：",
-            "# ── Token 用量：",
-            "# ── 会话累计：",
             "if ($pkgVer) {",
             "# ── Python 工具链",
             "# ── Rust 工具链",
@@ -1759,6 +1759,14 @@ mod tests {
             assert!(at > last, "{marker} out of order at {at} (prev {last})");
             last = at;
         }
+        assert!(
+            !ps1.contains("# ── Token 用量："),
+            "tokens segment out of default rows since D43"
+        );
+        assert!(
+            ps1.contains("'context' = '{icon}{pct}% [{used}/{window}]'"),
+            "D43 context template bakes absolute tokens, not mix"
+        );
         assert!(
             ps1.contains("$slRows | ForEach-Object { Write-Output $_ }"),
             "three-row tail emits each non-empty row"
@@ -1840,10 +1848,11 @@ mod tests {
 
     #[test]
     fn three_row_layout_renders_three_lines_with_new_segments() {
-        // D42 行为判据（pwsh 闸门）：三行输出（项目状态 / agent 状态 /
-        // 运行时状态）；第三行含工具计数、MCP 计数、token 用量；context
-        // 段带构成占比（transcript 夹具：3 次 tool_use 加文本行）。codex
-        // D40 评审 G2 顺带钉 kimi 退化：同配置下 kimi 并一行。
+        // D43 行为判据（pwsh 闸门）：三行输出（项目状态 / agent 状态 /
+        // 运行时状态）；一行 = 目录与 git（去 shell），二行 = agent 态加
+        // 模型加 context 百分比带 token 绝对值（构成 mix 退位）加耗时，
+        // 三行 = shell 加工具计数与 MCP 计数（token 用量整段退出第三行）。
+        // codex D40 评审 G2 顺带钉 kimi 退化：同配置下 kimi 并一行。
         if !pwsh_on_path() {
             return;
         }
@@ -1869,35 +1878,47 @@ mod tests {
         tp_body.push_str(r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"ok"}]}}"#);
         tp_body.push('\n');
         std::fs::write(&tp, tp_body).unwrap();
+        // cost 295200000 ms 经 FmtDur 恰为 3d10h（用户裁定示例形态）。
         let stdin = format!(
-            r#"{{"session_id":"d1","transcript_path":{},"context_window":{{"context_window_size":1000000,"used_percentage":20}}}}"#,
+            r#"{{"session_id":"d1","transcript_path":{},"context_window":{{"context_window_size":1000000,"used_percentage":20}},"cost":{{"total_duration_ms":295200000}}}}"#,
             serde_json::to_string(&tp.display().to_string()).unwrap()
         );
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, stdin.as_bytes());
         let lines: Vec<&str> = out.lines().filter(|l| !l.trim().is_empty()).collect();
         assert_eq!(lines.len(), 3, "three-row layout: {out}");
-        // 一行项目状态：目录在场，agent 态不在一行。
-        assert!(lines[0].contains("dir") || lines[0].len() > 0, "{out}");
+        // 一行项目状态：目录与 git 在场，agent 态与 shell 名不在一行。
+        assert!(!lines[0].trim().is_empty(), "{out}");
         assert!(
             !lines[0].contains("claude:"),
             "agent state belongs to row 2: {out}"
         );
-        // 二行 agent 状态：agent 态加百分比加构成。
-        assert!(lines[1].contains("claude:unknown"), "{out}");
-        assert!(lines[1].contains("20%"), "{out}");
         assert!(
-            lines[1].contains("[s") && lines[1].contains('t') && lines[1].contains('m'),
-            "context mix present in row 2: {out}"
+            !lines[0].contains("pwsh") && !lines[0].contains("powershell"),
+            "shell name belongs to row 3: {out}"
         );
-        // 三行运行时状态：工具计数加 token 用量。
+        // 二行 agent 状态：agent 态加耗时；context 段百分比直跟 token
+        // 绝对值括号（FmtTok 1024 进位：200000/1024=195k、1000000/1024=977k）。
+        assert!(lines[1].contains("claude:unknown"), "{out}");
+        assert!(
+            lines[1].contains("20% [195k/977k]"),
+            "D43 context shows absolute tokens, not mix: {out}"
+        );
+        assert!(lines[1].contains("3d10h"), "duration moved to row 2: {out}");
+        // 三行运行时状态：工具计数在场；token 用量整段退出第三行。
         assert!(
             lines[2].contains('3'),
             "tool count 3 (tool_use events) in row 3: {out}"
         );
-        // FmtTok 是 1024 进位（200000/1024=195k、1000000/1024=977k）。
-        assert!(lines[2].contains("195k/977k"), "token usage row 3: {out}");
-        // kimi 退化（codex G2）：同配置并一行，三要素仍可见。
+        assert!(
+            !lines[2].contains("195k/977k"),
+            "token usage out of row 3 since D43: {out}"
+        );
+        assert!(
+            !lines[2].contains("3d10h"),
+            "duration out of row 3 since D43: {out}"
+        );
+        // kimi 退化（codex G2）：同配置并一行，agent 态与 token 绝对值仍可见。
         let out_kimi = run_statusline(&p, "kimi", &home, stdin.as_bytes());
         let kimi_lines = out_kimi
             .lines()
@@ -1983,8 +2004,8 @@ mod tests {
         let p = deploy_script(&home).unwrap();
         let out = run_statusline(&p, "claude", &home, real_payload);
         assert!(
-            out.contains("claude:unknown") && out.contains("20%"),
-            "D18 single-row full config upgrades cleanly: {out}"
+            out.contains("claude:unknown") && out.contains("20% [195k/977k]"),
+            "D18 single-row full config upgrades cleanly (D43 context form): {out}"
         );
         assert_eq!(
             out.lines().filter(|l| !l.trim().is_empty()).count(),
