@@ -587,14 +587,14 @@ if ($nerd -and $projKind -eq 'cpp') {
 /// TAIL：单行收口输出。
 const PS1_TAIL: &str = "\nWrite-Output ($parts -join ' | ')\nexit 0\n";
 
-/// 排间断点（D40 双排，D41 三行泛化）：第 n 排段块后收线并重置收集器。
+/// 排间断点（D40 双排，D42 三行泛化）：第 n 排段块后收线并重置收集器。
 fn ps1_rowsplit(n: usize) -> String {
     format!(
         "\n$slRow{n} = ($parts -join ' | ')\n$parts = [System.Collections.Generic.List[string]]::new()\n"
     )
 }
 
-/// 多行尾（D41 三行版）：末排收线后按 agent 出行——kimi 只取首行（S025
+/// 多行尾（D42 三行版）：末排收线后按 agent 出行——kimi 只取首行（S025
 /// 源码实证）加 grok 多行未实证，运行时自动并单行（保包版本与工具链段
 /// 可见性，codex review F2）；空排不出空行（F3）。
 fn ps1_tail_multi(last_row: usize) -> String {
@@ -632,15 +632,15 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
     })
 }
 
-/// 默认第一行「项目状态」（D41 用户裁定三行定名）：shell / cwd / git 分支。
+/// 默认第一行「项目状态」（D42 用户裁定三行定名）：shell / cwd / git 分支。
 /// D18 定制面 `segments` 键缺省回落此序。
 pub(crate) const DEFAULT_SEGMENTS: &[&str] = &["shell", "dir", "git"];
 
-/// 默认第二行「agent 状态」（D41）：agent 态 / 模型 / context 构成与
+/// 默认第二行「agent 状态」（D42）：agent 态 / 模型 / context 构成与
 /// 百分比。`segments2` 键缺省回落此序。
 pub(crate) const DEFAULT_SEGMENTS2: &[&str] = &["oma", "model", "context"];
 
-/// 默认第三行「运行时状态」（D41 用户补名）：tools 计数 / mcp 计数 /
+/// 默认第三行「运行时状态」（D42 用户补名）：tools 计数 / mcp 计数 /
 /// token 用量 / 耗时，加包版本与工具链段尾巴。`segments3` 键缺省回落
 /// 此序。
 pub(crate) const DEFAULT_SEGMENTS3: &[&str] = &[
@@ -742,7 +742,7 @@ fn render_cfg_block(cfg: &StatuslineConfig) -> String {
     out
 }
 
-/// 按段序拼装状态栏脚本（D41 三行分组）：HEAD 加烘焙定制块加（按需）COMMON /
+/// 按段序拼装状态栏脚本（D42 三行分组）：HEAD 加烘焙定制块加（按需）COMMON /
 /// CTXPROBE / PROBE 加逐行段块与排间断点加多行尾。COMMON 在任一行含
 /// dir / oma / mcp 时拼入（rev-parse 与目录消费）；CTXPROBE 在含
 /// context / tools 时拼入（transcript 解析一次供构成与计数两段）；PROBE
@@ -824,7 +824,7 @@ pub struct StatuslineConfig {
     /// `segments2`（D40）：第二行（agent 状态）段 id 数组；键缺省回落
     /// `DEFAULT_SEGMENTS2`，空数组 = 不出第二行。
     pub segments2: Option<Vec<String>>,
-    /// `segments3`（D41）：第三行（运行时状态）段 id 数组；键缺省回落
+    /// `segments3`（D42）：第三行（运行时状态）段 id 数组；键缺省回落
     /// `DEFAULT_SEGMENTS3`，空数组 = 不出第三行。
     pub segments3: Option<Vec<String>>,
     /// `single_line`（D40）：退单排开关（两排段并一行；默认 false 双排）。
@@ -912,19 +912,33 @@ fn parse_config(text: &str) -> Result<StatuslineConfig, String> {
     Ok(cfg)
 }
 
-/// 段序生效值（D41 三行）：三行各自取用户清单或默认序（未知与跨行重复
-/// id 由拼装器拒）。
+/// 段序生效值（D42 三行）：三行各自取用户清单或默认序（未知与跨行重复
+/// id 由拼装器拒）。**默认行去重**（codex D42 评审 F1，升级破面修复）：
+/// 用户显式写过的段 id 从后续默认行剔除——v1.1.0 双排配置未写 segments3
+/// 时默认第三行追加 tools 等段与已写 segments2 重复，跨行重复检查直接硬
+/// 错退出 1；老单排全量配置同理（默认二/三行全被剔空 = 保持单行，与老
+/// 行为一致）。显式写的行不去重（跨行重复仍由拼装器拒）。
 fn effective_orders(cfg: &StatuslineConfig) -> Result<Vec<Vec<&str>>, String> {
     let rows = [
         (&cfg.segments, DEFAULT_SEGMENTS),
         (&cfg.segments2, DEFAULT_SEGMENTS2),
         (&cfg.segments3, DEFAULT_SEGMENTS3),
     ];
+    // 用户显式写过的段 id 全集：默认行剔除这些 id。
+    let user_ids: std::collections::HashSet<&str> = rows
+        .iter()
+        .filter_map(|(user, _)| user.as_ref())
+        .flat_map(|segs| segs.iter().map(String::as_str))
+        .collect();
     Ok(rows
         .iter()
         .map(|(user, default)| match user {
             Some(segs) => segs.iter().map(String::as_str).collect(),
-            None => default.to_vec(),
+            None => default
+                .iter()
+                .copied()
+                .filter(|id| !user_ids.contains(id))
+                .collect(),
         })
         .collect())
 }
@@ -1149,7 +1163,7 @@ pub const EXAMPLE_TOML: &str = r#"# ~/.hst/statusline.toml —— 状态栏用�
 # 改完本文件重跑一次 oma agents statusline 生效。
 # 键级缺省回落：没写的键用内嵌默认；坏文件硬错退出 1。
 
-# 段落清单（D41 三行定名：项目状态 / agent 状态 / 运行时状态）：
+# 段落清单（D42 三行定名：项目状态 / agent 状态 / 运行时状态）：
 # segments = 第一行项目状态、segments2 = 第二行 agent 状态、
 # segments3 = 第三行运行时状态，段 id 数组即全量（显隐加顺序）。
 # 缺省第一行 = shell / dir / git；缺省第二行 = oma / model / context；
@@ -1704,7 +1718,7 @@ mod tests {
 
     #[test]
     fn assemble_keeps_default_segment_order() {
-        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D41 三行：
+        // 期望值来自段块的注释标记（源内容，独立于拼装逻辑）。D42 三行：
         // 一行项目状态（shell/dir/git），二行 agent 状态（oma/model/
         // context），三行运行时状态（tools/mcp/tokens/duration 加尾巴）。
         let ps1 = default_statusline_ps1();
@@ -1800,7 +1814,7 @@ mod tests {
         let err =
             assemble_statusline_ps1(&[&["git", "git"]], &StatuslineConfig::default()).unwrap_err();
         assert!(err.contains("duplicate statusline segment"), "{err}");
-        // D40/D41：跨行重复同拒（同一渲染面出现两次）。
+        // D40/D42：跨行重复同拒（同一渲染面出现两次）。
         let err = assemble_statusline_ps1(&[&["git"], &["git"]], &StatuslineConfig::default())
             .unwrap_err();
         assert!(
@@ -1817,7 +1831,7 @@ mod tests {
 
     #[test]
     fn three_row_layout_renders_three_lines_with_new_segments() {
-        // D41 行为判据（pwsh 闸门）：三行输出（项目状态 / agent 状态 /
+        // D42 行为判据（pwsh 闸门）：三行输出（项目状态 / agent 状态 /
         // 运行时状态）；第三行含工具计数、MCP 计数、token 用量；context
         // 段带构成占比（transcript 夹具：3 次 tool_use 加文本行）。codex
         // D40 评审 G2 顺带钉 kimi 退化：同配置下 kimi 并一行。
@@ -1894,7 +1908,7 @@ mod tests {
 
     #[test]
     fn single_line_config_collapses_rows() {
-        // D40/D41 逃生门：single_line = true 时三行并一行。
+        // D40/D42 逃生门：single_line = true 时三行并一行。
         if !pwsh_on_path() {
             return;
         }
@@ -1913,6 +1927,56 @@ mod tests {
             out.lines().filter(|l| !l.trim().is_empty()).count(),
             1,
             "single line output: {out}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn legacy_row_configs_upgrade_without_duplicate_error() {
+        // codex D42 评审 F1（升级破面）：用户显式写过的段从后续默认行剔
+        // 除——v1.1.0 双排配置（未写 segments3）与 D18 老单排全量配置都
+        // 不再撞跨行重复硬错。
+        if !pwsh_on_path() {
+            return;
+        }
+        // 形 1：v1.1.0 双排原样（EXAMPLE_TOML 上一版）。
+        let home = scratch("upg1");
+        std::fs::write(
+            home.join("statusline.toml"),
+            concat!(
+                "segments = [\"shell\",\"dir\",\"oma\",\"model\",\"context\",\"git\"]\n",
+                "segments2 = [\"tools\",\"mcp\",\"tokens\",\"duration\",\"package\",\"python\",\"rust\",\"node\",\"zig\",\"go\",\"cpp\"]\n"
+            ),
+        )
+        .unwrap();
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline(&p, "claude", &home, b"{}");
+        assert!(
+            out.contains("claude:unknown"),
+            "v1.1.0 dual-row config upgrades cleanly: {out}"
+        );
+        let _ = std::fs::remove_dir_all(&home);
+        // 形 2：D18 老单排全量（14 段一行）——默认二/三行全被剔空，保持
+        // 单行输出（老行为）。
+        let home = scratch("upg2");
+        std::fs::write(
+            home.join("statusline.toml"),
+            concat!(
+                "segments = [\"shell\",\"dir\",\"oma\",\"model\",\"context\",\"duration\",\"git\",",
+                "\"package\",\"python\",\"rust\",\"node\",\"zig\",\"go\",\"cpp\"]\n"
+            ),
+        )
+        .unwrap();
+        let p = deploy_script(&home).unwrap();
+        let out = run_statusline(&p, "claude", &home, b"{}");
+        assert!(
+            out.contains("claude:unknown"),
+            "D18 single-row full config upgrades cleanly: {out}"
+        );
+        assert_eq!(
+            out.lines().filter(|l| !l.trim().is_empty()).count(),
+            1,
+            "emptied default rows keep single line: {out}"
         );
         let _ = std::fs::remove_dir_all(&home);
     }
