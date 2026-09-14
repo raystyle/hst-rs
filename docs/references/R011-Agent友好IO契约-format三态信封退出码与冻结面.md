@@ -33,7 +33,7 @@
 
 ## 冻结面
 
-> 本批机器可读命令。D15 收窄后仅余两行（`oma check` / `oma status` / 七会话命令随编排面移除）；self update 的 marker 键只增不改（D16 增 `update.mirror` / `update.source` / `update.fallback`）；statusline 的 marker 键同理只增（D18 增 `statusline.custom` / `statusline.script`，自备脚本在场或刚部署时才打）。
+> 本批机器可读命令。D15 收窄后仅余两行（`oma check` / `oma status` / 七会话命令随编排面移除）；self update 的 marker 键只增不改（D16 增 `update.mirror` / `update.source` / `update.fallback`）；statusline 的 marker 键同理只增（D18 增 `statusline.custom` / `statusline.script`，自备脚本在场或刚部署时才打）。取值词汇表注记（D48 起，键仍只增不改）：`update.mirror` 在 `HST_MIRROR` 未设时取值改 `fallback-default:<基址>`（原 `off` 语义收窄为专表显式空串；显式基址取值不变），舰队侧按值分流的消费方随 D48 知会。
 
 | 命令 | json 数据形 | jsonl 行形 |
 | --- | --- | --- |

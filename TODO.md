@@ -39,6 +39,7 @@ D31 至 D45 前目标（2026-09-13 ohmycloud 协调批与状态栏 HUD 迭代五
 
 - [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞；D42 三行测试已顺带钉 kimi 并一行，剩 grok）
 - [ ] D47 后续（codex 评审 F3，不阻断）：host_asset_name 与 host_keywords 抽 (os, arch) 取参纯函数去 cfg!，linux CI 恢复全平台资产名字面量断言
+- [ ] D48 后续（codex 评审 F3，不阻断）：run 的读序分支收束（mirror-first 失败后 GitHub 再失败不回环、DefaultFallback 才触发回退）补假基址集成断言，钉「不回环」性质（现仅两轮真网 e2e 佐证）
 - [x] stable 封版时随批发版把 README 安装直链与镜像注释从 msvc 名翻 gnu 名（codex 评审 F4，v1.1.5 封版落地：直链与镜像注释与 Move-Item 路径三处全翻）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
