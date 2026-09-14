@@ -54,3 +54,12 @@ D16，2026-09-08。
 - 下载后强制 sha256 校验：不符属安全问题，报错不回落 [实证： 单测覆盖解析与判等；2026-09-08 镜像三分支端到端绿]。
 - 网络类失败（边车或下载）打 `update.mirror=failed` 加 `update.fallback=github` 回落 GitHub dev 路径；stable 通道不吃镜像（`update.mirror=skipped channel=stable`）。
 - 镜像契约来自 ohmycloud 对账（2026-09-08 五点回执）：路径 `<tool>/<version>/<asset>` 加 `.sha256` 边车即锚，无 manifest；oma 段分 dev 与 stable 两段各回各段（ome #8/#9 教训），stable 段待首个 v* tag。
+
+## 追记：D47 Windows 构建切 gnu
+
+[实证： 2026-09-14 本机交叉复验加门禁全绿；ohmycloud 侧裸环境实弹]
+
+- 用户裁 2026-09-14 摆脱 VC：CI 的 windows-latest msvc 岗换 ubuntu-latest 交叉岗（apt mingw-w64），Windows 资产名改 `hst-<arch>-pc-windows-gnu.zip`；本机 WSL 复验 PE32+ console 12.13MB 与 msvc 同量级，ohmycloud 裸环境（零 CC/AR 配置）交叉编译与 lan-win 实跑全过，CRT 静态零 DLL 依赖。
+- host_keywords 的 windows 臂改 `["windows-gnu","windows-msvc","windows"]` 梯子：新源选 gnu、旧 release 仅 msvc 资产时回落命中、通用 windows 词保底旧 msvc 二进制升级新源 [实证： 单测 gnu 主名与 msvc-only 回落两断言]。
+- 过渡窗口（codex 复核确认）：push 后镜像 sync 完成前边车 404 走 MirrorStep::Fallback 回落 GitHub dev，旧 dev 的 msvc 资产由通用词兜住，下一轮即 gnu [推断： 依回落链路代码与镜像 sync 时序]。
+- 交叉岗 Test 跳过（PE 不可在 linux 跑，测试面由 linux/mac 双岗覆盖）；cfg(windows) 分支断言在 linux CI 不再参与编译，gnu 字面量的 CI 校验缺口以取参纯函数重构记 TODO（codex 评审 F3，不阻断）。

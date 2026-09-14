@@ -11,7 +11,7 @@ D47 Windows 构建切 gnu 交叉编译（2026-09-14 立项，摆脱 VC）：
 - [x] 测试三面（host_asset_name 的 windows 断言改 gnu 名；pick_asset 资产列表换 gnu 断言选 gnu，补 msvc-only 回落断言）
 - [x] 本机交叉复验（mingw 一次过，PE32+ console x86-64，12.13MB 与 ohmycloud 实证同量级）
 - [ ] 门禁（cargo test --locked 全绿、md 四件套）
-- [ ] 四原语与文档同步（PRD D47、GOAL 起点锚点进程、PLAN、本清单；README stable 直链随封版翻 gnu 名记入待办）
+- [x] 四原语与文档同步（PRD D47、GOAL 起点锚点进程、PLAN、本清单；随 codex 评审 F1/F2 补 S028 D47 追记与 INDEX update.rs 行标签）
 - [ ] 提交推 main、CI 绿与 dev release gnu 资产名回报（不动版本号、不推 tag）
 
 D46 状态栏 agent 版本段（2026-09-13 立项，v1.1.4 方向）：
@@ -28,6 +28,8 @@ D46 状态栏 agent 版本段（2026-09-13 立项，v1.1.4 方向）：
 D31 至 D45 前目标（2026-09-13 ohmycloud 协调批与状态栏 HUD 迭代五连发，v1.0.0 至 v1.1.3；G2 补钉一行除外，见队列）：清单见 git 历史。
 
 - [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞；D42 三行测试已顺带钉 kimi 并一行，剩 grok）
+- [ ] D47 后续（codex 评审 F3，不阻断）：host_asset_name 与 host_keywords 抽 (os, arch) 取参纯函数去 cfg!，linux CI 恢复全平台资产名字面量断言
+- [ ] stable 封版时随批发版把 README 安装直链与镜像注释从 msvc 名翻 gnu 名（codex 评审 F4 单列防丢；stable 段现仍是 msvc 资产，提前翻会 404）
 
 D30 前目标（2026-09-12 当日闭环归档 P0047，v0.6.1 发版）：四回归修加串面清扫加老用户迁移剧本八步活体全过，清单见 git 历史。
 
