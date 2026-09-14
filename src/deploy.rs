@@ -1486,8 +1486,9 @@ fn write_skill(path: &Path, generated: &str, report: &mut DeployReport) -> Resul
 
 const AGENTS_MD: &str = "# AGENTS\n\n本项目会话由 HST（Hooks, Statusline, Trace，原 Oh My Agents）治理：agent 状态写用户级 `~/.hst/state/`，诊断与部署经 hst CLI。\n";
 
-/// Skills: `.agents/skills/ohmyagents` is the source; Claude and Grok and
-/// Kimi get copies (Claude does not scan .agents/skills, S008).
+/// Skills: `.agents/skills/hst` is the canonical source (D49);
+/// ohmyagents stays as the compat-window copy until 1.2.0. Claude and Grok
+/// and Kimi get copies (Claude does not scan .agents/skills, S008).
 fn deploy_skills(root: &Path, report: &mut DeployReport) -> Result<(), String> {
     // D49：canonical 名 hst；旧牌 ohmyagents 同体双写兼容窗至 1.2.0。
     let source = root.join(".agents").join("skills").join("hst");

@@ -27,14 +27,14 @@
 | `.tools\md-replace.py` | 中文与反斜杠路径安全的字面批量替换（规避 sed 坑 M023） |
 | `.tools\md-heading-scan.py` | 标题括号规范扫描（G001 标题干净的机检项；代码围栏内的注释不计） |
 | `.tools\mdcharlint.py` | 四类禁用字符检查（G005：破折号、箭头、emoji、非法全角；掩豁免区后逐字符扫） |
-| `src\main.rs` | CLI 入口与子命令分发（init/doctor/agents/hook/self/completions）；`--json` 信封出口 |
+| `src\main.rs` | CLI 入口与子命令分发（init/doctor/agents/hook/self/completions）；`--json` 信封出口；D49 skill --write 双写 canonical hst 加 ohmyagents 兼容体 |
 | `src\lib.rs` | 模块声明 |
 | `src\archive.rs` | 通用归档工具：sha256 校验、zip / tar.gz 解包、目录复制、host os/arch（D15 自 rmux.rs 剥离） |
 | `src\hook.rs` | `hst hook`：事件到四态映射与用户级 session 分键 state 落盘（D28），加密钥拦截分流 |
 | `src\agents.rs` | `hst agents`：PATH / 环境变量 / 默认目录探测 |
 | `src\doctor.rs` | `hst doctor`：只读诊断（yolo / 信任 / 二进制 / 登录态 / hook 形态 / 状态栏 / 用户级与项目级状态面，D28；会话健康随 D15 移除） |
 | `src\yolo.rs` | `hst init --yolo[=full|partial|off]`：四家分级落盘、ours 退役（用户级与项目级）与 pretrust（D33） |
-| `src\deploy.rs` | `hst init` hook/skill 部署层：hook 注册四家用户级（D28：claude/codex/grok/kimi 用户层，codex trusted_hash 预种，kimi `[[hooks]]` 合并），项目级 ours 注册与 shim 退役，幂等合并（M059 无引号正斜杠形态，同形去重）；SKILL.md 由 COMMAND_MAP 命令图生成（标记覆写三态） |
+| `src\deploy.rs` | `hst init` hook/skill 部署层：hook 注册四家用户级（D28：claude/codex/grok/kimi 用户层，codex trusted_hash 预种，kimi `[[hooks]]` 合并），项目级 ours 注册与 shim 退役，幂等合并（M059 无引号正斜杠形态，同形去重）；SKILL.md 由 COMMAND_MAP 命令图生成（标记覆写三态；D49 四处双写 canonical hst 加 ohmyagents 兼容体至 1.2.0） |
 | `src\shim.rs` | D27 自包含状态 shim 加 D28 用户级常驻与 session 分键：hst-state.cmd（jq 首选加 findstr 回落，PATH 探 jq）、hst-state.ps1（D39 sh 兼容载体，Windows 注册指向）、hst-state.sh（bash 或 mac zsh）、grok baked 包装；落 `~/.hst/hooks/`，双写 agent 最新加 session 键，SessionEnd GC |
 | `src\install.rs` | hst 根解析（hst_home）加自管根存量探测（managed_binaries/version）加共享下载件 download_asset（self update 复用）；安装机器已随 D20 删除 |
 | `src\statusline.rs` | `hst statusline`：四家状态栏写入面幂等合并（S025 矩阵）；projKind 含 rust/node/python/zig/go/cpp（P0032）；脚本拆段拼装加用户级定制烘焙（~/.hst/statusline.toml 分层键加 --script 整替换，D18；D42 三行、D43 五点精修、D44 默认两行、D45 段名 hst；D46 agent 版本段：payload version 优先否则本地探加 mtime 键控缓存，标记两形 `agent[-<version>]:state`，codex 内置项 codex-version 并裁去 context-remaining 回十二项） |

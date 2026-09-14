@@ -8,7 +8,7 @@ D49 技能名翻 hst 加旧名兼容窗（2026-09-14 立项，用户裁「走」
 
 - [x] skillgen 双名渲染（render_skill_as 单体加 canonical hst 加 legacy ohmyagents 带 CTA；三常量导出）
 - [x] 用户级双写（cmd_skill：~/.claude/skills/hst/ 加 ohmyagents/，兼容行 marker 带 compat 尾注）
-- [x] 项目级四处双写（deploy_skills：.agents/.claude/.grok/.kimi-code 各 canonical 加兼容；write_skill 体参化；deploy_kimi_project 随 canonical；仓自有 .agents/skills git mv）
+- [x] 项目级四处双写（deploy_skills：.agents/.claude/.grok/.kimi-code 各 canonical 加兼容；write_skill 体参化；deploy_kimi_project 随 canonical；仓自有源目录翻新：新增 hst 为 canonical 加旧 ohmyagents 改兼容体保留）
 - [x] 测试与门禁（skillgen 断言翻新加 legacy 双断言、deploy 集成断言四处双写；177 单测加 28 集成绿、fmt、md 四件套）
 - [x] dogfood（用户级双技能落位实弹、本会话技能列表双技能刷新可见、init 重生项目八面）
 - [x] 文档四处同步（AGENTS 意图路由行、R002 skill 行、INDEX skillgen 行、main.rs 命令注释）
