@@ -14,7 +14,7 @@
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：D48 stable 通道镜像腿与 GitHub API 限流自救（澄清一轮已裁）：fetch_release 补 GH_TOKEN Bearer、stable 镜像腿（边车 digest 对 selfupdate 记录判新）、缺省 GitHub 优先失败自动回退（默认基址 env.ohmygh.com）、HST_MIRROR 扩到 stable（mirror-first 语义沿用）、段随通道 dev 禁回落 stable；验收测试门禁全绿推 main（封版时点另裁）。
+- **锚定的目标**：无（D48 已交付，2026-09-14 当日闭环：评审对齐推 main CI 绿、真网 e2e 两轮、herdr 知会 ohmycloud；D47 F3 取参纯函数与 D48 F3 假基址断言在 TODO 队列随下批）。
 
 ### 推进时间线
 
@@ -22,6 +22,7 @@
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-14 | **D48 交付**：aca34df 加 493e2ed 推 main CI 绿（GH_TOKEN Bearer、MirrorPlan 三态缺省回退、via_mirror 段参数化双通道、净增 3 单测 177 加 28 绿）；codex 评审 F1 至 F4 全收（F1 R011 取值注记并点名 ohmycloud、F2 S028 时限尾注、F3 假基址断言入队、F4 收口补钩）；真网 e2e 两轮（mirror-first stable 腿下载替换与幂等 already-latest）；封版时点另裁 |
 | 2026-09-14 | **D48 立项开工**：ohmycloud 取材四点（边车同构事实、缺省回退腿先例、GH_TOKEN Bearer、GitHub 先镜像回退读序）澄清一轮即裁；ark selfupdate.rs 三层读序源码取证（mirror_first、official_asset_meta、mirror_attempts、mirror_fallback_meta、download 兜底）；判新锚定 hst 形态（zip 资产边车 digest 对 selfupdate.json 记录，不照抄 ark 裸 exe 直比）；PRD 已采纳、GOAL/PLAN/TODO 随批，实现落码中 |
 | 2026-09-14 | **v1.1.5 封版（D47 stable 切 gnu 时点，用户裁「继续」）**：版本与 CHANGELOG 与 README gnu 翻名（F4 清账）推 main 绿后 tag v1.1.5（2c0240b）；tag run 34841505094 六岗绿，stable 六资产 windows 位 gnu、镜像 hst/stable 段清一色 gnu 族（msvc 残量被 --delete-excluded 清）curl 200、三方 digest 对账全等（win 5f90046e）；herdr 知会 ohmycloud pin 素材 |
 | 2026-09-14 | **D47 交付**：codex 四发现全收（F1 S028 追记、F2 INDEX 标签、F4 README 翻名单列、F3 取参纯函数重构入队）加 ohmycloud 对线无异议后推 main（6995cb3 加 11fffa5）；CI run 34840283806 六岗全绿，dev release 六资产 windows 位出 `hst-x86_64-pc-windows-gnu.zip`（msvc 退场）、镜像 hst/dev 同步到货；未动版本号未推 tag，herdr 回执 ohmycloud |

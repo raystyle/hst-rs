@@ -6,13 +6,13 @@
 
 D48 stable 通道镜像腿与 GitHub API 限流自救（2026-09-14 立项，澄清一轮已裁）：
 
-- [ ] GH_TOKEN 附加（fetch_release 在位附 Bearer，鉴权头纯函数可单测；S028 旧记随批更正）
-- [ ] stable 镜像腿（mirror URL 构造器段化 seg 随通道；stable_via_mirror 边车 digest 对 selfupdate 记录判新；stable 安装路径补记 digest）
-- [ ] 读序与缺省回退（HST_MIRROR 设值 mirror-first 两通道；未设 GitHub 优先失败自动回退默认基址；空串关；镜像计划三态纯函数）
-- [ ] 测试（鉴权头、段化 URL 双形、镜像计划三态、stable digest 判新三态；dev 既有用例回归）
-- [ ] 门禁与评审（cargo test --locked、fmt、md 四件套、herdr codex review 对齐）
-- [ ] 文档随批（R002 self update 行、S028 D48 追记、INDEX update.rs 行 D48 标签）
-- [ ] 推 main（CI 绿回执；封版时点另裁不推 tag；herdr 知会 ohmycloud）
+- [x] GH_TOKEN 附加（fetch_release 在位附 Bearer，鉴权头纯函数可单测；S028 旧记随批更正）
+- [x] stable 镜像腿（mirror URL 构造器段化 seg 随通道；stable_via_mirror 边车 digest 对 selfupdate 记录判新；stable 安装路径补记 digest）
+- [x] 读序与缺省回退（HST_MIRROR 设值 mirror-first 两通道；未设 GitHub 优先失败自动回退默认基址；空串关；镜像计划三态纯函数）
+- [x] 测试（鉴权头、段化 URL 双形、镜像计划三态、stable digest 判新三态；dev 既有用例回归）
+- [x] 门禁与评审（cargo test --locked、fmt、md 四件套、herdr codex review 对齐）
+- [x] 文档随批（R002 self update 行、S028 D48 追记、INDEX update.rs 行 D48 标签）
+- [x] 推 main（aca34df 加 493e2ed CI 绿；封版时点另裁未推 tag；herdr 知会 ohmycloud 已发含 update.mirror 取值变化点名）
 
 D47 Windows 构建切 gnu 交叉编译（2026-09-14 立项，摆脱 VC）：
 
@@ -20,7 +20,7 @@ D47 Windows 构建切 gnu 交叉编译（2026-09-14 立项，摆脱 VC）：
 - [x] self update 切 gnu（src\update.rs：host_asset_name windows 臂改 hst-{arch}-pc-windows-gnu.zip；host_keywords 改 windows-gnu 优先加 msvc 回落加通用 windows 词保底，注释记 2026-09-14 裁定）
 - [x] 测试三面（host_asset_name 的 windows 断言改 gnu 名；pick_asset 资产列表换 gnu 断言选 gnu，补 msvc-only 回落断言）
 - [x] 本机交叉复验（mingw 一次过，PE32+ console x86-64，12.13MB 与 ohmycloud 实证同量级）
-- [ ] 门禁（cargo test --locked 全绿、md 四件套）
+- [x] 门禁（cargo test --locked 全绿、md 四件套；174 单测加 28 集成绿）
 - [x] 四原语与文档同步（PRD D47、GOAL 起点锚点进程、PLAN、本清单；随 codex 评审 F1/F2 补 S028 D47 追记与 INDEX update.rs 行标签）
 - [x] 提交推 main、CI 绿与 dev release gnu 资产名回报（6995cb3 加 11fffa5；run 34840283806 六岗全绿，dev 六资产 windows 位 hst-x86_64-pc-windows-gnu.zip，镜像 hst/dev 到货；未动版本号未推 tag，herdr 回执 ohmycloud 已发）
 
