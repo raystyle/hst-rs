@@ -210,7 +210,7 @@
 | --- | --- | --- | --- |
 | M101 | `M101-drive与paste错误.md` | send-keys、Enter、`C-c`、bracketed paste、marker 假阳性 | M001、M008、M027、M038-M039 |
 | M102 | `M102-信任与hook配置错误.md` | 信任框、trust、pretrust、init、yolo、ENOENT、共享目录 | M002、M009-M011、M042、M044-M048、M051、M055-M061 |
-| M103 | `M103-文档与命名错误.md` | 命名、显示名、CLI 名、六态、diary、标题规范、索引登记 | M003-M005、M013-M014、M030、M043 |
+| M103 | `M103-文档与命名错误.md` | 命名、显示名、CLI 名、六态、diary、标题规范、索引登记、长行编辑锚 | M003-M005、M013-M014、M030、M043、M064 |
 | M104 | `M104-rmux安装与CLI调用错误.md` | 安装、`-V`、`-S`、`-L`、`cmd()`、`-t` 前缀匹配 | M006-M007、M016、M020、M029 |
 | M105 | `M105-agent检测与状态判断错误.md` | PATH、which、idle、Quiet、CPU | M012、M018-M019、M040 |
 | M106 | `M106-Windows进程与daemon启动错误.md` | os error 5、Job Object、WMI、exit-empty、pane cwd | M015、M017、M021-M022、M031、M041 |
