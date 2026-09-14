@@ -8,13 +8,13 @@
 > 当前目标的起点：何时发起、为什么发起、要解决什么问题。
 
 - **日期**：2026-09-14。
-- **起点**：v1.1.4 发版收口后，用户裁 D47：Windows 构建切 gnu 交叉编译摆脱 VC（背景实证 ohmycloud 侧已验：WSL 加 rustup target 加 mingw-w64 交叉一次过、产物实跑全过、CRT 静态零 DLL 依赖、12.1MB 与 msvc 同量级）。改动三面（CI 交叉岗、self update 资产名与关键词、测试），验收 cargo test --locked 全绿、md 门禁、推 main 后 dev 滚动源自动出 gnu 资产；不动版本号、不推 tag（stable 封版另裁）。
+- **起点**：v1.1.5 封版收官后，ohmycloud 知会转需求 D48（澄清一轮已裁）：舰队滚 1.1.5 撞 api.github.com 匿名 403 时 `hst self update` 无镜像回退断源；补 stable 镜像腿（边车 digest 判新复用 dev 机制）、缺省 GitHub 优先加失败自动回退镜像腿、GH_TOKEN Bearer 附加、ark 三层读序参照（段随通道、dev 禁回落 stable）。
 
 ## 锚点
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：无（D47 已交付，2026-09-14 当日闭环：评审对齐推 main、CI 六岗全绿、dev 源与镜像 hst/dev 出 gnu 资产；README gnu 翻名与 F3 取参纯函数重构在 TODO 队列随封版或下批）。
+- **锚定的目标**：D48 stable 通道镜像腿与 GitHub API 限流自救（澄清一轮已裁）：fetch_release 补 GH_TOKEN Bearer、stable 镜像腿（边车 digest 对 selfupdate 记录判新）、缺省 GitHub 优先失败自动回退（默认基址 env.ohmygh.com）、HST_MIRROR 扩到 stable（mirror-first 语义沿用）、段随通道 dev 禁回落 stable；验收测试门禁全绿推 main（封版时点另裁）。
 
 ### 推进时间线
 
@@ -22,8 +22,9 @@
 
 | 日期 | 进展 |
 | --- | --- |
-| 2026-09-14 | **D47 交付**：codex 四发现全收（F1 S028 追记、F2 INDEX 标签、F4 README 翻名单列、F3 取参纯函数重构入队）加 ohmycloud 对线无异议后推 main（6995cb3 加 11fffa5）；CI run 34840283806 六岗全绿，dev release 六资产 windows 位出 `hst-x86_64-pc-windows-gnu.zip`（msvc 退场）、镜像 hst/dev 同步到货；未动版本号未推 tag，herdr 回执 ohmycloud |
+| 2026-09-14 | **D48 立项开工**：ohmycloud 取材四点（边车同构事实、缺省回退腿先例、GH_TOKEN Bearer、GitHub 先镜像回退读序）澄清一轮即裁；ark selfupdate.rs 三层读序源码取证（mirror_first、official_asset_meta、mirror_attempts、mirror_fallback_meta、download 兜底）；判新锚定 hst 形态（zip 资产边车 digest 对 selfupdate.json 记录，不照抄 ark 裸 exe 直比）；PRD 已采纳、GOAL/PLAN/TODO 随批，实现落码中 |
 | 2026-09-14 | **v1.1.5 封版（D47 stable 切 gnu 时点，用户裁「继续」）**：版本与 CHANGELOG 与 README gnu 翻名（F4 清账）推 main 绿后 tag v1.1.5（2c0240b）；tag run 34841505094 六岗绿，stable 六资产 windows 位 gnu、镜像 hst/stable 段清一色 gnu 族（msvc 残量被 --delete-excluded 清）curl 200、三方 digest 对账全等（win 5f90046e）；herdr 知会 ohmycloud pin 素材 |
+| 2026-09-14 | **D47 交付**：codex 四发现全收（F1 S028 追记、F2 INDEX 标签、F4 README 翻名单列、F3 取参纯函数重构入队）加 ohmycloud 对线无异议后推 main（6995cb3 加 11fffa5）；CI run 34840283806 六岗全绿，dev release 六资产 windows 位出 `hst-x86_64-pc-windows-gnu.zip`（msvc 退场）、镜像 hst/dev 同步到货；未动版本号未推 tag，herdr 回执 ohmycloud |
 | 2026-09-14 | **D47 立项开工**：用户裁 Windows 构建切 gnu 交叉编译摆脱 VC（背景实证 ohmycloud 侧已验：交叉一次过、CRT 静态零 DLL 依赖、12.1MB）；改动三面 = dev-release.yml 交叉岗（apt mingw-w64、Test 交叉岗跳过、Package 后缀判 target）、update.rs 的 host_asset_name 与 host_keywords 切 gnu 带 msvc 回落、测试三断言；本机 mingw 复验一次过（PE32+ console x86-64，12.13MB 与实证同量级） |
 | 2026-09-13 | **D46 收口加 v1.1.4 发版**：codex 终验轮 G2 至 G4 收口（G2 探针第二步 2>&1 1>$null 恒空回归改单 2>&1 合流加 stderr 正例测试、G3 S025 容错口径改可执行正则形态、G4 PLAN/TODO/GOAL 刷第 2 轮口径）后零异议放行；tag v1.1.4 打在 28d1e41，CI 绿、六资产 digest 三方对账全等（win c3e14ad6 / linux 1066677e / mac e044a0d9）、镜像 hst/stable 到货；本机镜像直装换装 v1.1.4 重跑 statusline 与 doctor 全绿（kimi login warn 属既有环境事实）；herdr 回执 ohmycloud 已发（六资产 sha、S025 连字符形标记与 G3 正则适配口径、codex 内置集十二项变化、wsl G8 复验邀请）；wsl 总台 G8 复验对端进行中 |
 | 2026-09-13 | **D46 第 2 轮两裁与 codex 三轮评审**：用户实弹观察后两裁（版本段连字符形 `claude-2.1.268:working` 替空格形；codex 面去 context-remaining 只留 `Context N% used` 缺省集回十二项）；codex diff 轮 F1 至 F6 收口（e61d66b）后新抓 G1 探针两步取值随 bced707 收口；serde 加 validator 加 toml 选型材料用户递材入 TODO 队列；终验轮对 bced707 进行中，零异议即 tag v1.1.4 |

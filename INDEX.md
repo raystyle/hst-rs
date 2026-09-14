@@ -38,7 +38,7 @@
 | `src\shim.rs` | D27 自包含状态 shim 加 D28 用户级常驻与 session 分键：hst-state.cmd（jq 首选加 findstr 回落，PATH 探 jq）、hst-state.ps1（D39 sh 兼容载体，Windows 注册指向）、hst-state.sh（bash 或 mac zsh）、grok baked 包装；落 `~/.hst/hooks/`，双写 agent 最新加 session 键，SessionEnd GC |
 | `src\install.rs` | hst 根解析（hst_home）加自管根存量探测（managed_binaries/version）加共享下载件 download_asset（self update 复用）；安装机器已随 D20 删除 |
 | `src\statusline.rs` | `hst statusline`：四家状态栏写入面幂等合并（S025 矩阵）；projKind 含 rust/node/python/zig/go/cpp（P0032）；脚本拆段拼装加用户级定制烘焙（~/.hst/statusline.toml 分层键加 --script 整替换，D18；D42 三行、D43 五点精修、D44 默认两行、D45 段名 hst；D46 agent 版本段：payload version 优先否则本地探加 mtime 键控缓存，标记两形 `agent[-<version>]:state`，codex 内置项 codex-version 并裁去 context-remaining 回十二项） |
-| `src\update.rs` | `hst self update`：dev 滚动源与正式版判新、sha256 取证、Windows rename 舞步（S028）；HST_MIRROR 镜像通道加缓存击穿（D16；D45 资产名钉 hst-*、旧 OMA_MIRROR 读已删；D47 Windows 资产名与关键词切 gnu 带 msvc 回落） |
+| `src\update.rs` | `hst self update`：dev 滚动源与正式版判新、sha256 取证、Windows rename 舞步（S028）；HST_MIRROR 镜像通道加缓存击穿（D16；D45 资产名钉 hst-*、旧 OMA_MIRROR 读已删；D47 Windows 资产名与关键词切 gnu 带 msvc 回落；D48 双通道镜像腿、缺省 GitHub 失败自动回退默认基址、GH_TOKEN Bearer） |
 | `src\trace.rs` | `hst trace` 六视图：联邦读四家原生会话库归一检索（P0013/P0014，S018/S019/S020；D15 连坐删除，D19 全量恢复） |
 | `src\verify.rs` | `hst agents verify`：四家无头验收两层判据（D17，S033）；状态栏 mock 直跑（D46 标记两形判据加 HST_VER_CACHE_DIR 隔离）加 hook 用户级注册 byte 备份 Drop 还原与 env 隔离判据（D28）；grok trusted_folders 种子加 Drop 摘除 |
 | `src\diagnose.rs` | `hst diagnose cache\|agents`：活性诊断族（D21）：网关发现（env 覆盖大于 claude env 大于 codex provider）、缓存双连探测加 ds 特判、配置指向加在册加 key 活性加 thinking 对照 |

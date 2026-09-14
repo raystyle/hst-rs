@@ -63,3 +63,13 @@ D16，2026-09-08。
 - host_keywords 的 windows 臂改 `["windows-gnu","windows-msvc","windows"]` 梯子：新源选 gnu、旧 release 仅 msvc 资产时回落命中、通用 windows 词保底旧 msvc 二进制升级新源 [实证： 单测 gnu 主名与 msvc-only 回落两断言]。
 - 过渡窗口（codex 复核确认）：push 后镜像 sync 完成前边车 404 走 MirrorStep::Fallback 回落 GitHub dev，旧 dev 的 msvc 资产由通用词兜住，下一轮即 gnu [推断： 依回落链路代码与镜像 sync 时序]。
 - 交叉岗 Test 跳过（PE 不可在 linux 跑，测试面由 linux/mac 双岗覆盖）；cfg(windows) 分支断言在 linux CI 不再参与编译，gnu 字面量的 CI 校验缺口以取参纯函数重构记 TODO（codex 评审 F3，不阻断）。
+
+## 追记：D48 stable 镜像腿与缺省回退
+
+[实证： 2026-09-14 本机两轮 e2e（mirror-first stable 腿真网下载替换与幂等 already-latest）加 177 单测加 28 集成绿；ark selfupdate.rs 源码取证]
+
+- 断源背景：ohmycloud 舰队滚 1.1.5 撞 api.github.com 匿名 403（IP 限流）时 self update 无镜像回退（stable 通道镜像整段跳过、`HST_MIRROR` 未设时 dev 也纯 GitHub），四机靠镜像段手工锚装绕过。
+- GH_TOKEN 更正：本文件前文「GH_TOKEN 自动附带」与现码不符：D48 前的 fetch_release 只发 UA 与 Accept；D48 起在位附 `Authorization: Bearer`（ark resolve.rs 同款，匿名 60 升 5000 次每时）[实证]。
+- 读序三态（D48，ark 先例）：`HST_MIRROR` 设值 = 基址覆盖加 mirror-first 两通道（失败回落 GitHub）；未设 = GitHub 优先、失败自动回退镜像腿用默认基址 `env.ohmygh.com`（不占缺省行为面）；空串 = 镜像全关。kv 标记 `update.mirror` 三值形 = 基址原值、`fallback-default:<基址>`、`off`。
+- stable 镜像腿 = dev 机制参数化复用（via_mirror 抽段参）：deterministic 名取 `<基址>/hst/stable/<资产>.sha256` 边车、digest 对 `selfupdate.json` 记录判新（hst 是 zip 资产，digest 是压缩包哈希与 exe 哈希不可比，故不照抄 ark 的裸 exe 直比）、sha256 强校验、Windows rename 舞步复用；段随通道、dev 禁落 stable（防正式版装进滚动源）。
+- e2e 两轮 [实证]：R1 mirror-first stable 腿真网下载 v1.1.5 linux 资产、校验替换、记录 tag `stable-mirror`；R2 边车 digest 与记录一致出 `update.ok=already-latest`。R1 替换的是运行中 debug 二进制，顺带实证旧 v1.1.5 二进制的旧行为（mirror 设值加 stable 仍 skipped），即舰队断腿的机器侧复现。

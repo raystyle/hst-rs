@@ -4,6 +4,16 @@
 
 ## 当前目标
 
+D48 stable 通道镜像腿与 GitHub API 限流自救（2026-09-14 立项，澄清一轮已裁）：
+
+- [ ] GH_TOKEN 附加（fetch_release 在位附 Bearer，鉴权头纯函数可单测；S028 旧记随批更正）
+- [ ] stable 镜像腿（mirror URL 构造器段化 seg 随通道；stable_via_mirror 边车 digest 对 selfupdate 记录判新；stable 安装路径补记 digest）
+- [ ] 读序与缺省回退（HST_MIRROR 设值 mirror-first 两通道；未设 GitHub 优先失败自动回退默认基址；空串关；镜像计划三态纯函数）
+- [ ] 测试（鉴权头、段化 URL 双形、镜像计划三态、stable digest 判新三态；dev 既有用例回归）
+- [ ] 门禁与评审（cargo test --locked、fmt、md 四件套、herdr codex review 对齐）
+- [ ] 文档随批（R002 self update 行、S028 D48 追记、INDEX update.rs 行 D48 标签）
+- [ ] 推 main（CI 绿回执；封版时点另裁不推 tag；herdr 知会 ohmycloud）
+
 D47 Windows 构建切 gnu 交叉编译（2026-09-14 立项，摆脱 VC）：
 
 - [x] CI 交叉岗（.github\workflows\dev-release.yml：windows-latest msvc 岗换 ubuntu-latest gnu 交叉岗；apt mingw-w64 条件步、Test 交叉岗跳过注明 linux/mac 双岗覆盖、Package 的 exe 后缀改判 triple）

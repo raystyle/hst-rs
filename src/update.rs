@@ -2,9 +2,12 @@
 //! releases 为空时走 `--git` 源码安装路径）。
 //! 机制见 S028：releases/latest API、资产命名约定 `hst-<triple>.(zip|tar.gz)`、
 //! Windows 运行中自替换（rename 舞步）、Unix 原子 rename 覆盖。
-//! D16：`HST_MIRROR=<基址>` 镜像通道只覆盖 dev（镜像无 manifest，判新走
-//! `<基址>/hst/dev/<资产名>.sha256` 边车）；stable 与未设置时行为不变。
-//! 镜像侧仅网络类失败回落 GitHub；哈希不符是安全问题，报错不回落。
+//! D16 起 `HST_MIRROR=<基址>` 走镜像通道；D48 扩到双通道与缺省回退：设值 =
+//! mirror-first（失败回落 GitHub）；未设 = GitHub 优先、失败自动回退镜像腿
+//! （默认基址 env.ohmygh.com）；空串 = 镜像全关。镜像判新走
+//! `<基址>/hst/<seg>/<资产名>.sha256` 边车对安装记录（段随通道，dev 禁落
+//! stable）。镜像侧仅网络类失败回落；哈希不符是安全问题，报错不回落。
+//! GH_TOKEN 在位附 Bearer（D48，匿名 60 升 5000 次每时）。
 
 use std::path::{Path, PathBuf};
 
@@ -55,6 +58,30 @@ impl Channel {
             Channel::Latest => "latest",
         }
     }
+
+    /// 镜像段名（D48）：段随通道、禁跨段回落（dev 不落 stable，防正式版
+    /// 装进滚动源；ark 同款裁定）。
+    pub fn mirror_seg(self) -> &'static str {
+        match self {
+            Channel::Dev => "dev",
+            Channel::Latest => "stable",
+        }
+    }
+}
+
+/// GH_TOKEN 鉴权头（D48，ark resolve.rs 同款语义）：在位附 Bearer，匿名
+/// 限流 60 次每时升 5000 次。纯函数入参可单测。
+fn auth_header(token: Option<&str>) -> Option<String> {
+    let t = token?.trim();
+    if t.is_empty() {
+        None
+    } else {
+        Some(format!("Bearer {t}"))
+    }
+}
+
+fn github_token() -> Option<String> {
+    std::env::var("GH_TOKEN").ok()
 }
 
 pub fn fetch_release(repo: &str, channel: Channel) -> Result<Release, String> {
@@ -62,10 +89,13 @@ pub fn fetch_release(repo: &str, channel: Channel) -> Result<Release, String> {
         Channel::Latest => format!("https://api.github.com/repos/{repo}/releases/latest"),
         Channel::Dev => format!("https://api.github.com/repos/{repo}/releases/tags/dev"),
     };
-    let resp = ureq::get(&url)
+    let mut req = ureq::get(&url)
         .set("User-Agent", UA)
-        .set("Accept", "application/vnd.github+json")
-        .call();
+        .set("Accept", "application/vnd.github+json");
+    if let Some(h) = auth_header(github_token().as_deref()) {
+        req = req.set("Authorization", &h);
+    }
+    let resp = req.call();
     let resp = match resp {
         Ok(r) => r,
         Err(ureq::Error::Status(404, _)) => {
@@ -187,17 +217,45 @@ fn dev_is_current(release: &Release) -> bool {
     digest_matches(read_record_digest().as_deref(), asset.digest.as_deref())
 }
 
-// ===== D16 镜像通道（HST_MIRROR，只覆盖 dev） =====
+// ===== 镜像通道（D16 起 HST_MIRROR；D48 双通道与缺省回退） =====
 
-/// 镜像开关：`HST_MIRROR=<基址>`（去空白与尾斜杠）；未设/空 = None（行为与现状一致）。
-fn mirror_base() -> Option<String> {
-    // D45 oma 遗产清扫：旧 OMA_MIRROR 兼容读已删（D29 定的 1.1.0 窗口已过）。
-    let v = std::env::var("HST_MIRROR").ok()?;
-    let v = v.trim().trim_end_matches('/');
-    if v.is_empty() {
-        None
-    } else {
-        Some(v.to_string())
+/// 镜像缺省基址（D48）：GitHub 腿失败时的自动回退腿用它；`HST_MIRROR`
+/// 设值覆盖（mirror-first 语义沿用 D16）。
+const DEFAULT_MIRROR_BASE: &str = "https://env.ohmygh.com";
+
+/// 镜像计划三态（D48，纯函数可测）：`HST_MIRROR` 未设 = GitHub 优先、失败
+/// 自动回退默认基址（不占缺省行为面，ark 先例）；设值 = 基址覆盖加
+/// mirror-first（两通道，D16 语义扩 stable）；空串 = 镜像全关。
+#[derive(Debug, PartialEq, Eq)]
+enum MirrorPlan {
+    Off,
+    DefaultFallback,
+    First(String),
+}
+
+fn resolve_mirror_plan(env_raw: Option<String>) -> MirrorPlan {
+    match env_raw {
+        None => MirrorPlan::DefaultFallback,
+        Some(v) => {
+            let v = v.trim().trim_end_matches('/').to_string();
+            if v.is_empty() {
+                MirrorPlan::Off
+            } else {
+                MirrorPlan::First(v)
+            }
+        }
+    }
+}
+
+impl MirrorPlan {
+    /// kv 标记值：First 沿用基址原值；DefaultFallback 标 fallback-default
+    /// 形（区别于 off 与显式基址）；Off 沿用 off。
+    fn kv(&self) -> String {
+        match self {
+            MirrorPlan::Off => "off".to_string(),
+            MirrorPlan::DefaultFallback => format!("fallback-default:{DEFAULT_MIRROR_BASE}"),
+            MirrorPlan::First(b) => b.clone(),
+        }
     }
 }
 
@@ -221,23 +279,24 @@ fn host_asset_name() -> String {
     }
 }
 
-/// 镜像边车 URL（判新与校验）。`?t=<unix>` 缓存击穿取 origin 现值
-/// （ohmycloud 2026-09-08 建议，CF 缓存键含 query；D16 尾巴修）。
-fn mirror_sidecar_url(base: &str, name: &str) -> String {
+/// 镜像边车 URL（判新与校验）。段随通道（D48：dev 与 stable 各回各段）。
+/// `?t=<unix>` 缓存击穿取 origin 现值（ohmycloud 2026-09-08 建议，CF 缓存
+/// 键含 query；D16 尾巴修）。
+fn mirror_sidecar_url(base: &str, seg: &str, name: &str) -> String {
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
     format!(
-        "{}/hst/dev/{name}.sha256?t={ts}",
+        "{}/hst/{seg}/{name}.sha256?t={ts}",
         base.trim_end_matches('/')
     )
 }
 
-/// 镜像资产 URL。`?v=<边车锚>` 以边车哈希为缓存键：每滚天然新键，
-/// 永久免疫「边车新、资产旧」的陈旧缓存窗口（R2 取对象只看 path）。
-fn mirror_asset_url(base: &str, name: &str, anchor: &str) -> String {
-    format!("{}/hst/dev/{name}?v={anchor}", base.trim_end_matches('/'))
+/// 镜像资产 URL。段随通道（D48）。`?v=<边车锚>` 以边车哈希为缓存键：每滚
+/// 天然新键，永久免疫「边车新、资产旧」的陈旧缓存窗口（R2 取对象只看 path）。
+fn mirror_asset_url(base: &str, seg: &str, name: &str, anchor: &str) -> String {
+    format!("{}/hst/{seg}/{name}?v={anchor}", base.trim_end_matches('/'))
 }
 
 /// sha256sum 边车解析：首字段即哈希（标准双空格、单空格均可），容错
@@ -272,11 +331,12 @@ enum MirrorStep {
     Fallback(String),
 }
 
-/// dev 镜像路径：边车判新（免 manifest）→ 下载 → sha256 校验（不符即报错，
-/// 安全问题不回落）→ 解包安装复用现状。
-fn dev_via_mirror(base: &str, force: bool) -> Result<MirrorStep, String> {
+/// 镜像腿（D48 双通道）：deterministic 名取段内边车 digest、对安装记录判新
+/// （一致即 current、不同保守更新、无记录保守更新）→ 下载 → sha256 强校验
+/// （不符即报错，安全问题不回落）→ 解包安装复用现状。段随通道传入。
+fn via_mirror(base: &str, seg: &str, force: bool) -> Result<MirrorStep, String> {
     let name = host_asset_name();
-    let sidecar_url = mirror_sidecar_url(base, &name);
+    let sidecar_url = mirror_sidecar_url(base, seg, &name);
     let sidecar = match http_get_string(&sidecar_url) {
         Ok(t) => t,
         Err(e) => return Ok(MirrorStep::Fallback(format!("sidecar {sidecar_url}: {e}"))),
@@ -290,7 +350,7 @@ fn dev_via_mirror(base: &str, force: bool) -> Result<MirrorStep, String> {
     }
     // 资产缓存键锚定边车哈希（裸 hex），消边车与资产的缓存不同步窗口。
     let anchor = digest.strip_prefix("sha256:").unwrap_or(&digest);
-    let asset_url = mirror_asset_url(base, &name, anchor);
+    let asset_url = mirror_asset_url(base, seg, &name, anchor);
     println!("update.asset={name}");
     let tmp = std::env::temp_dir().join(format!(
         "hst-update-{}-{}",
@@ -319,7 +379,7 @@ fn dev_via_mirror(base: &str, force: bool) -> Result<MirrorStep, String> {
     };
     let final_path = self_replace(&extracted)?;
     println!("update.replaced={}", final_path.display());
-    write_record(&digest, "dev-mirror");
+    write_record(&digest, &format!("{seg}-mirror"));
     println!("update.source=mirror");
     println!("update.ok=true");
     Ok(MirrorStep::Done)
@@ -373,33 +433,45 @@ pub fn git_install(repo: &str) -> Result<(), String> {
 
 /// `hst self update` entry: release path with git fallback.
 ///
-/// dev 通道（滚动源）判新：资产带 digest 且等于当前 exe 的 sha256 → 已最新；
-/// 否则更新（滚动版版本号常不变，sha256 才是判据）。latest 通道按版本比较。
+/// 判新（D48 双通道）：dev 按 rolling digest（资产 sha256 对安装记录，滚动版
+/// 版本号常不变）；latest 走 GitHub 时按版本 tag，走镜像腿时同 dev 按 digest。
+/// 读序：`HST_MIRROR` 设值 mirror-first（失败回落 GitHub）；未设 GitHub 优先、
+/// 失败（403 限流与网络类）自动回退镜像腿（默认基址）；空串镜像全关。
 pub fn run(repo: &str, channel: Channel, git_mode: bool, force: bool) -> Result<(), String> {
     println!("update.current={}", env!("CARGO_PKG_VERSION"));
     println!("update.channel={}", channel.as_str());
-    let mirror = mirror_base();
-    println!("update.mirror={}", mirror.as_deref().unwrap_or("off"));
+    let plan = resolve_mirror_plan(std::env::var("HST_MIRROR").ok());
+    println!("update.mirror={}", plan.kv());
     if git_mode {
         return git_install(repo);
     }
-    if let Some(base) = mirror.as_deref() {
-        match channel {
-            // 镜像无 manifest，只覆盖 dev；stable 直连 GitHub（说明后走原路径）。
-            Channel::Latest => println!("update.mirror=skipped channel=stable"),
-            Channel::Dev => match dev_via_mirror(base, force)? {
-                MirrorStep::Done => return Ok(()),
-                MirrorStep::Fallback(detail) => {
-                    println!("update.mirror=failed detail={detail}");
-                    println!("update.fallback=github");
-                }
-            },
+    if let MirrorPlan::First(base) = &plan {
+        match via_mirror(base, channel.mirror_seg(), force)? {
+            MirrorStep::Done => return Ok(()),
+            MirrorStep::Fallback(detail) => {
+                println!("update.mirror=failed detail={detail}");
+                println!("update.fallback=github");
+            }
         }
     }
     println!("update.source=github");
     let release = match fetch_release(repo, channel) {
         Ok(r) => r,
         Err(e) => {
+            // D48 回退腿：GitHub 失败自动落镜像段边车锚（救 api.github.com
+            // 匿名 403 限流与断网）。mirror-first 已试过镜像的不回环重试。
+            if matches!(plan, MirrorPlan::DefaultFallback) {
+                println!("update.release=unavailable detail={e}");
+                println!("update.fallback=mirror");
+                return match via_mirror(DEFAULT_MIRROR_BASE, channel.mirror_seg(), force)? {
+                    MirrorStep::Done => Ok(()),
+                    MirrorStep::Fallback(detail) => {
+                        println!("update.mirror=failed detail={detail}");
+                        println!("update.hint=hst self update --git 走源码安装（封版前主路径）");
+                        Ok(())
+                    }
+                };
+            }
             println!("update.release=unavailable detail={e}");
             println!("update.hint=hst self update --git 走源码安装（封版前主路径）");
             return Ok(());
@@ -575,8 +647,8 @@ mod tests {
     #[test]
     fn mirror_urls_trim_trailing_slash() {
         // 缓存击穿约定（ohmycloud 2026-09-08）：边车带 ?t= 时间戳、资产带
-        // ?v=<边车锚>；两者基址尾斜杠归一。
-        let s = mirror_sidecar_url("https://env.ohmygh.com/", "hst-x.zip");
+        // ?v=<边车锚>；两者基址尾斜杠归一。段随通道（D48）：dev 与 stable 各回各段。
+        let s = mirror_sidecar_url("https://env.ohmygh.com/", "dev", "hst-x.zip");
         assert!(
             s.starts_with("https://env.ohmygh.com/hst/dev/hst-x.zip.sha256?t="),
             "sidecar url: {s}"
@@ -586,10 +658,65 @@ mod tests {
                 .chars()
                 .all(|c| c.is_ascii_digit())
         );
-        let a = mirror_asset_url("https://env.ohmygh.com/", "hst-x.zip", "abc123");
+        let a = mirror_asset_url("https://env.ohmygh.com/", "dev", "hst-x.zip", "abc123");
         assert_eq!(a, "https://env.ohmygh.com/hst/dev/hst-x.zip?v=abc123");
-        let s2 = mirror_sidecar_url("https://env.ohmygh.com", "hst-x.zip");
+        let s2 = mirror_sidecar_url("https://env.ohmygh.com", "dev", "hst-x.zip");
         assert!(s2.starts_with("https://env.ohmygh.com/hst/dev/hst-x.zip.sha256?t="));
+        // D48 stable 段双形（stable 通道镜像腿与回退腿的 URL 契约）。
+        let s3 = mirror_sidecar_url("https://env.ohmygh.com", "stable", "hst-x.zip");
+        assert!(s3.starts_with("https://env.ohmygh.com/hst/stable/hst-x.zip.sha256?t="));
+        let a3 = mirror_asset_url("https://env.ohmygh.com", "stable", "hst-x.zip", "dead");
+        assert_eq!(a3, "https://env.ohmygh.com/hst/stable/hst-x.zip?v=dead");
+    }
+
+    #[test]
+    fn auth_header_attaches_bearer_only_for_nonempty_token() {
+        // D48：GH_TOKEN 在位附 Bearer（匿名 60 升 5000 次每时）；空串与
+        // 纯空白视同未设（ark resolve.rs 同款语义）。
+        assert_eq!(auth_header(None), None);
+        assert_eq!(auth_header(Some("")), None);
+        assert_eq!(auth_header(Some("   ")), None);
+        assert_eq!(auth_header(Some("tok")), Some("Bearer tok".to_string()));
+        assert_eq!(auth_header(Some(" tok ")), Some("Bearer tok".to_string()));
+    }
+
+    #[test]
+    fn mirror_plan_three_states_from_env_raw() {
+        // D48 读序三态：未设 = GitHub 优先失败自动回退默认基址；设值 = 基址
+        // 覆盖加 mirror-first；空串 = 镜像全关（显式退出通道）。
+        assert!(matches!(
+            resolve_mirror_plan(None),
+            MirrorPlan::DefaultFallback
+        ));
+        assert!(matches!(
+            resolve_mirror_plan(Some(String::new())),
+            MirrorPlan::Off
+        ));
+        assert!(matches!(
+            resolve_mirror_plan(Some("  ".to_string())),
+            MirrorPlan::Off
+        ));
+        match resolve_mirror_plan(Some("https://m.example.com/".to_string())) {
+            MirrorPlan::First(b) => assert_eq!(b, "https://m.example.com"),
+            other => panic!("expected First, got {other:?}"),
+        }
+        // kv 标记值形：off 沿用、默认回退标 fallback-default、显式基址原值。
+        assert_eq!(
+            resolve_mirror_plan(None).kv(),
+            "fallback-default:https://env.ohmygh.com"
+        );
+        assert_eq!(resolve_mirror_plan(Some(String::new())).kv(), "off");
+        assert_eq!(
+            resolve_mirror_plan(Some("https://m.example.com".to_string())).kv(),
+            "https://m.example.com"
+        );
+    }
+
+    #[test]
+    fn mirror_seg_follows_channel_without_crossing() {
+        // D48：段随通道（dev 与 stable 各回各段，dev 禁回落 stable）。
+        assert_eq!(Channel::Dev.mirror_seg(), "dev");
+        assert_eq!(Channel::Latest.mirror_seg(), "stable");
     }
 
     #[test]
