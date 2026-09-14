@@ -104,7 +104,7 @@ enum Commands {
         #[command(subcommand)]
         cmd: DiagnoseCmd,
     },
-    /// 生成 hst 自身 SKILL.md（从活命令树自适应渲染；--write 落用户级 ~/.claude/skills/hst/ 加 ohmyagents 兼容窗双写）
+    /// 生成 hst 自身 SKILL.md（从活命令树自适应渲染；--write 落用户级 ~/.claude/skills/hst/，旧牌 ohmyagents 目录幂等退役）
     Skill {
         /// 写入用户级技能目录后退出（缺省打印到 stdout）
         #[arg(long)]
@@ -389,13 +389,15 @@ fn cmd_skill(write: bool) -> Result<(), String> {
 }
 
 /// 旧牌用户级技能目录退役：SKILL.md 带我们生成签名（活命令树自适应
-/// 生成行，oma 与 hst 两代都含）才删整目录；用户手改或他源不动。
+/// 生成行，oma 与 hst 两代都含）才退役；用户手改或他源不动。外科式
+///（codex F4）：先删 SKILL.md，目录仅在空时收（伴生资源不连带删）。
 fn retire_user_skill(dir: &std::path::Path) -> Option<&std::path::Path> {
     let md = std::fs::read_to_string(dir.join("SKILL.md")).ok()?;
     if !md.contains("活命令树自适应生成") {
         return None;
     }
-    std::fs::remove_dir_all(dir).ok()?;
+    std::fs::remove_file(dir.join("SKILL.md")).ok()?;
+    let _ = std::fs::remove_dir(dir);
     Some(dir)
 }
 

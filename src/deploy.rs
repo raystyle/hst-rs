@@ -1491,7 +1491,8 @@ fn deploy_skills(root: &Path, report: &mut DeployReport) -> Result<(), String> {
 }
 
 /// D49 第 2 轮：旧牌项目技能目录退役——SKILL.md 属 ours（marker 家族或
-/// 旧静态版）才删整目录；用户手改或他源内容不动。
+/// 旧静态版）才退役；用户手改或他源内容不动。外科式（codex F4）：先删
+/// SKILL.md，目录仅在空时收（伴生资源不连带删）。
 fn retire_legacy_skill_dir(dir: &Path, report: &mut DeployReport) {
     let Ok(md) = std::fs::read_to_string(dir.join("SKILL.md")) else {
         return;
@@ -1502,7 +1503,8 @@ fn retire_legacy_skill_dir(dir: &Path, report: &mut DeployReport) {
     if !ours {
         return;
     }
-    if std::fs::remove_dir_all(dir).is_ok() {
+    if std::fs::remove_file(dir.join("SKILL.md")).is_ok() {
+        let _ = std::fs::remove_dir(dir);
         report.wrote.push(format!("{} (retired)", dir.display()));
     }
 }
@@ -2226,9 +2228,21 @@ mod tests {
         let owned = root.join(".grok").join("skills").join("ohmyagents");
         std::fs::create_dir_all(&owned).unwrap();
         std::fs::write(owned.join("SKILL.md"), "user-owned skill\n").unwrap();
+        // ours 目录带伴生资源（codex F4 外科语义）：SKILL.md 删、伴生件与目录保留。
+        let extra = root.join(".kimi-code").join("skills").join("ohmyagents");
+        std::fs::create_dir_all(&extra).unwrap();
+        std::fs::write(
+            extra.join("SKILL.md"),
+            skill_md().replace("name: hst", "name: ohmyagents"),
+        )
+        .unwrap();
+        std::fs::write(extra.join("notes.md"), "supporting resource\n").unwrap();
         let mut r2 = DeployReport::default();
         deploy_skills(&root, &mut r2).unwrap();
         assert!(owned.join("SKILL.md").exists());
+        assert!(!extra.join("SKILL.md").exists());
+        assert!(extra.join("notes.md").exists());
+        assert!(extra.is_dir());
 
         // 幂等：再跑零退役写入（用户级注册也零写入）。
         let second = deploy_all_with(&root, &user, &oma, host_side()).unwrap();

@@ -9,7 +9,7 @@ D49 技能名翻 hst 旧牌直接删除（2026-09-14 立项；第 2 轮用户裁
 - [x] skillgen 单名渲染（canonical hst；第 2 轮删 legacy 渲染与常量）
 - [x] 用户级单写加退役（cmd_skill：~/.claude/skills/hst/；旧牌目录幂等退役打 skill.retired，用户手改跳过）
 - [x] 项目级四处单写加退役（deploy_skills：.agents/.claude/.grok/.kimi-code 各 skills/hst/；旧牌 ours 目录幂等退役 (retired)；write_skill 体参化；仓自有 .agents/skills 旧牌件删除）
-- [x] 测试与门禁（skillgen 断言翻新加 legacy 双断言、deploy 集成断言四处双写；177 单测加 28 集成绿、fmt、md 四件套）
+- [x] 测试与门禁（skillgen 唯一名断言、deploy 集成断言四处 hst 在位加旧牌 ours 目录退役加用户手改保留；177 单测加 28 集成绿、fmt、md 四件套）
 - [x] dogfood（用户级与项目级旧牌退役实弹：skill.retired 与四处 (retired) marker、各目录只剩 hst、外来 herdr 不动）
 - [x] 文档四处同步（AGENTS 意图路由行、R002 skill 行、INDEX skillgen 行、main.rs 命令注释）
 - [x] codex 评审对齐后推 main（1ad0685 加 74b8e1c CI 绿，F1 至 F3 全收；封版时点另裁；1.2.0 摘兼容双写加清扫已入队列）
