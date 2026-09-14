@@ -104,7 +104,7 @@ enum Commands {
         #[command(subcommand)]
         cmd: DiagnoseCmd,
     },
-    /// 生成 hst 自身 SKILL.md（从活命令树自适应渲染；--write 落用户级 ~/.claude/skills/ohmyagents/）
+    /// 生成 hst 自身 SKILL.md（从活命令树自适应渲染；--write 落用户级 ~/.claude/skills/hst/ 加 ohmyagents 兼容窗双写）
     Skill {
         /// 写入用户级技能目录后退出（缺省打印到 stdout）
         #[arg(long)]
@@ -365,17 +365,26 @@ fn run() -> Result<(), String> {
 }
 
 /// `hst skill [--write]`：从 clap 活命令树自适应渲染 SKILL.md（D22）。
+/// D49：技能名翻 hst；旧牌 ohmyagents 同体双写兼容窗至 1.2.0。
 fn cmd_skill(write: bool) -> Result<(), String> {
-    let body = hst::skillgen::render_skill(&Cli::command());
+    let tree = Cli::command();
+    let body = hst::skillgen::render_skill(&tree);
     if write {
-        let dir = hst::pathutil::user_home()?
-            .join(".claude")
-            .join("skills")
-            .join("ohmyagents");
+        let skills = hst::pathutil::user_home()?.join(".claude").join("skills");
+        // canonical：~/.claude/skills/hst/
+        let dir = skills.join(hst::skillgen::SKILL_NAME);
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let path = dir.join("SKILL.md");
         std::fs::write(&path, &body).map_err(|e| format!("{}: {e}", path.display()))?;
         println!("skill.wrote={}", path.display());
+        // D49 兼容窗：旧牌目录同体双写（name 加 CTA 不同），1.2.0 摘。
+        let legacy_dir = skills.join(hst::skillgen::SKILL_NAME_LEGACY);
+        std::fs::create_dir_all(&legacy_dir)
+            .map_err(|e| format!("{}: {e}", legacy_dir.display()))?;
+        let legacy_path = legacy_dir.join("SKILL.md");
+        std::fs::write(&legacy_path, hst::skillgen::render_skill_legacy(&tree))
+            .map_err(|e| format!("{}: {e}", legacy_path.display()))?;
+        println!("skill.wrote={} (compat)", legacy_path.display());
         Ok(())
     } else {
         println!("{body}");

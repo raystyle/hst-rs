@@ -42,7 +42,7 @@
 | `src\trace.rs` | `hst trace` 六视图：联邦读四家原生会话库归一检索（P0013/P0014，S018/S019/S020；D15 连坐删除，D19 全量恢复） |
 | `src\verify.rs` | `hst agents verify`：四家无头验收两层判据（D17，S033）；状态栏 mock 直跑（D46 标记两形判据加 HST_VER_CACHE_DIR 隔离）加 hook 用户级注册 byte 备份 Drop 还原与 env 隔离判据（D28）；grok trusted_folders 种子加 Drop 摘除 |
 | `src\diagnose.rs` | `hst diagnose cache\|agents`：活性诊断族（D21）：网关发现（env 覆盖大于 claude env 大于 codex provider）、缓存双连探测加 ds 特判、配置指向加在册加 key 活性加 thinking 对照 |
-| `src\skillgen.rs` | `hst skill`：从 clap 活命令树自适应渲染 SKILL.md（D22；frontmatter 按 Agent Skills 标准，--write 落用户级技能目录） |
+| `src\skillgen.rs` | `hst skill`：从 clap 活命令树自适应渲染 SKILL.md（D22；frontmatter 按 Agent Skills 标准，--write 落用户级技能目录；D49 名翻 hst 加 ohmyagents 兼容窗双写至 1.2.0） |
 | `src\secretguard.rs` | `hst hook` 密钥拦截闸（S030）：模式表八层防误报、实值比对通道、PreToolUse/UserPromptSubmit 阻断 exit 2 |
 | `src\fmtio.rs` | 全局输出三态（kv/json/jsonl）与结构化错误出口（issue #1 契约，R011）；JSON 信封函数（D15 自 api.rs 迁入） |
 | `src\caps.rs` | CPU 指令集能力与探针退出形态分类（S021/P0018：is_x86_feature_detected 加 0xC000001D 识别） |

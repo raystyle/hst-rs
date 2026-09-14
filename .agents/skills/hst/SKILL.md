@@ -1,6 +1,6 @@
 ---
-name: ohmyagents
-description: 旧牌兼容窗至 1.2.0，建议改用 hst 技能。hst 部署配置命令图：init、诊断、hook、状态栏、trace
+name: hst
+description: hst 部署配置命令图：init、诊断、hook、状态栏、trace
 ---
 
 # HST 命令图
