@@ -4,6 +4,16 @@
 
 ## 当前目标
 
+D47 Windows 构建切 gnu 交叉编译（2026-09-14 立项，摆脱 VC）：
+
+- [x] CI 交叉岗（.github\workflows\dev-release.yml：windows-latest msvc 岗换 ubuntu-latest gnu 交叉岗；apt mingw-w64 条件步、Test 交叉岗跳过注明 linux/mac 双岗覆盖、Package 的 exe 后缀改判 triple）
+- [x] self update 切 gnu（src\update.rs：host_asset_name windows 臂改 hst-{arch}-pc-windows-gnu.zip；host_keywords 改 windows-gnu 优先加 msvc 回落加通用 windows 词保底，注释记 2026-09-14 裁定）
+- [x] 测试三面（host_asset_name 的 windows 断言改 gnu 名；pick_asset 资产列表换 gnu 断言选 gnu，补 msvc-only 回落断言）
+- [x] 本机交叉复验（mingw 一次过，PE32+ console x86-64，12.13MB 与 ohmycloud 实证同量级）
+- [ ] 门禁（cargo test --locked 全绿、md 四件套）
+- [ ] 四原语与文档同步（PRD D47、GOAL 起点锚点进程、PLAN、本清单；README stable 直链随封版翻 gnu 名记入待办）
+- [ ] 提交推 main、CI 绿与 dev release gnu 资产名回报（不动版本号、不推 tag）
+
 D46 状态栏 agent 版本段（2026-09-13 立项，v1.1.4 方向）：
 
 - [x] 版本段实现（src\statusline.rs：SEG_OMA 两级版本获取、mtime 键控 probe 加 5 分钟失败静默窗、`~/.hst/cache/agent-version-<agent>.json` 单文件缓存、HST_VER_CACHE_DIR 覆盖、版本并入 `{agent}` 值模板零变化、$agent 本体不动）

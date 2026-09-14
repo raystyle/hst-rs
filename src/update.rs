@@ -85,7 +85,10 @@ pub fn fetch_release(repo: &str, channel: Channel) -> Result<Release, String> {
 /// release asset naming convention: hst-<triple>.zip / .tar.gz).
 fn host_keywords() -> &'static [&'static str] {
     if cfg!(target_os = "windows") {
-        &["windows-msvc", "windows"]
+        // D47（2026-09-14 用户裁）：构建切 gnu 交叉编译摆脱 VC。新源首选
+        // gnu 资产；旧 release 仅 msvc 资产时按 msvc 词命中，通用 windows
+        // 词保底旧 msvc 二进制升级。
+        &["windows-gnu", "windows-msvc", "windows"]
     } else if cfg!(target_os = "macos") {
         &["apple-darwin", "darwin"]
     } else {
@@ -207,7 +210,10 @@ fn host_asset_name() -> String {
         "x86_64"
     };
     if cfg!(target_os = "windows") {
-        format!("hst-{arch}-pc-windows-msvc.zip")
+        // D47（2026-09-14 用户裁）：构建切 gnu 交叉编译摆脱 VC，资产名随
+        // CI 交叉岗改 pc-windows-gnu；stable 未封版前旧 release 仍为 msvc
+        // 名，取侧由 host_keywords 回落兜住。
+        format!("hst-{arch}-pc-windows-gnu.zip")
     } else if cfg!(target_os = "macos") {
         format!("hst-{arch}-apple-darwin.tar.gz")
     } else {
@@ -510,16 +516,17 @@ mod tests {
                 .collect()
         };
         // 期望来自命名约定（S028）：资产名即编译目标 hst-<triple>，
-        // 本机平台与架构的 hst 包优先。
+        // 本机平台与架构的 hst 包优先。D47 起 windows 新源为 gnu 资产
+        //（同一 release 不与新 msvc 并存，旧 msvc-only 形态见下条回落）。
         let assets = mk(&[
             "hst-x86_64-unknown-linux-gnu.tar.gz",
             "hst-aarch64-apple-darwin.tar.gz",
-            "hst-x86_64-pc-windows-msvc.zip",
+            "hst-x86_64-pc-windows-gnu.zip",
             "notes.txt",
         ]);
         let picked = pick_asset(&assets).unwrap();
         if cfg!(windows) {
-            assert_eq!(picked.name, "hst-x86_64-pc-windows-msvc.zip");
+            assert_eq!(picked.name, "hst-x86_64-pc-windows-gnu.zip");
         } else if cfg!(target_os = "macos") {
             assert_eq!(picked.name, "hst-aarch64-apple-darwin.tar.gz");
         } else {
@@ -529,6 +536,15 @@ mod tests {
         let fb_assets = mk(&["hst-any.bin", "x.txt"]);
         let fallback = pick_asset(&fb_assets).unwrap();
         assert_eq!(fallback.name, "hst-any.bin");
+        // D47 回落：旧 release 仅 msvc 资产时 windows 命中 msvc 升级（stable
+        // 封版前的存量 release 形态）。
+        let msvc_only = mk(&["hst-x86_64-pc-windows-msvc.zip"]);
+        if cfg!(windows) {
+            assert_eq!(
+                pick_asset(&msvc_only).unwrap().name,
+                "hst-x86_64-pc-windows-msvc.zip"
+            );
+        }
     }
 
     // ===== D16 镜像通道纯函数 =====
@@ -539,9 +555,10 @@ mod tests {
         // windows 用 zip、其余 tar.gz），字面量断言本机期望。
         let name = host_asset_name();
         if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-            assert_eq!(name, "hst-x86_64-pc-windows-msvc.zip");
+            // D47：windows 资产名随 CI 交叉岗改 gnu。
+            assert_eq!(name, "hst-x86_64-pc-windows-gnu.zip");
         } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
-            assert_eq!(name, "hst-aarch64-pc-windows-msvc.zip");
+            assert_eq!(name, "hst-aarch64-pc-windows-gnu.zip");
         } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
             assert_eq!(name, "hst-aarch64-apple-darwin.tar.gz");
         } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
