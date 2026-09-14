@@ -16,7 +16,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：D49 技能名翻 hst 加旧名兼容窗：skillgen 双名渲染（canonical hst 加 legacy ohmyagents 带 CTA）、cmd_skill 用户级双写、deploy_skills 项目级四处双写、仓自有资产迁移；验收测试门禁全绿、dogfood 双技能落位，codex 评审对齐后推 main（封版时点另裁）。
+- **锚定的目标**：无（D49 已交付，2026-09-14 当日闭环：评审对齐推 main CI 绿、dogfood 双技能落位；1.2.0 摘兼容双写在 TODO 队列）。
 
 ### 推进时间线
 
@@ -24,6 +24,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-14 | **D49 交付**：codex F1 至 F3 全收后推 main（1ad0685 加 74b8e1c）CI 绿；用户级与项目级双技能落位实弹、本会话技能列表双技能刷新可见；1.2.0 摘兼容双写入 TODO 队列 |
 | 2026-09-14 | **D49 立项开工**：用户问「为什么不是 hst skill」（答 D14/D22/D45 保留旧牌裁定链）后裁「走」翻案；skillgen 双名渲染加 cmd_skill 用户级双写加 deploy_skills 四处双写加仓自有 .agents/skills 迁移；177 单测加 28 集成绿、dogfood 用户级与项目级双技能落位 |
 | 2026-09-14 | **D48 交付**：aca34df 加 493e2ed 推 main CI 绿（GH_TOKEN Bearer、MirrorPlan 三态缺省回退、via_mirror 段参数化双通道、净增 3 单测 177 加 28 绿）；codex 评审 F1 至 F4 全收（F1 R011 取值注记并点名 ohmycloud、F2 S028 时限尾注、F3 假基址断言入队、F4 收口补钩）；真网 e2e 两轮（mirror-first stable 腿下载替换与幂等 already-latest）；封版时点另裁 |
 | 2026-09-14 | **D48 立项开工**：ohmycloud 取材四点（边车同构事实、缺省回退腿先例、GH_TOKEN Bearer、GitHub 先镜像回退读序）澄清一轮即裁；ark selfupdate.rs 三层读序源码取证（mirror_first、official_asset_meta、mirror_attempts、mirror_fallback_meta、download 兜底）；判新锚定 hst 形态（zip 资产边车 digest 对 selfupdate.json 记录，不照抄 ark 裸 exe 直比）；PRD 已采纳、GOAL/PLAN/TODO 随批，实现落码中 |
