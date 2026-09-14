@@ -365,31 +365,38 @@ fn run() -> Result<(), String> {
 }
 
 /// `hst skill [--write]`：从 clap 活命令树自适应渲染 SKILL.md（D22）。
-/// D49：技能名翻 hst；旧牌 ohmyagents 同体双写兼容窗至 1.2.0。
+/// D49：技能名翻 hst 唯一名；旧牌 ohmyagents 目录幂等退役（第 2 轮裁定
+/// 直接删除，用户手改跳过）。
 fn cmd_skill(write: bool) -> Result<(), String> {
-    let tree = Cli::command();
-    let body = hst::skillgen::render_skill(&tree);
+    let body = hst::skillgen::render_skill(&Cli::command());
     if write {
         let skills = hst::pathutil::user_home()?.join(".claude").join("skills");
-        // canonical：~/.claude/skills/hst/
         let dir = skills.join(hst::skillgen::SKILL_NAME);
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let path = dir.join("SKILL.md");
         std::fs::write(&path, &body).map_err(|e| format!("{}: {e}", path.display()))?;
         println!("skill.wrote={}", path.display());
-        // D49 兼容窗：旧牌目录同体双写（name 加 CTA 不同），1.2.0 摘。
-        let legacy_dir = skills.join(hst::skillgen::SKILL_NAME_LEGACY);
-        std::fs::create_dir_all(&legacy_dir)
-            .map_err(|e| format!("{}: {e}", legacy_dir.display()))?;
-        let legacy_path = legacy_dir.join("SKILL.md");
-        std::fs::write(&legacy_path, hst::skillgen::render_skill_legacy(&tree))
-            .map_err(|e| format!("{}: {e}", legacy_path.display()))?;
-        println!("skill.wrote={} (compat)", legacy_path.display());
+        // D49 第 2 轮：旧牌用户级目录退役（内容带我们生成签名才删）。
+        let legacy = skills.join("ohmyagents");
+        if let Some(p) = retire_user_skill(&legacy) {
+            println!("skill.retired={}", p.display());
+        }
         Ok(())
     } else {
         println!("{body}");
         Ok(())
     }
+}
+
+/// 旧牌用户级技能目录退役：SKILL.md 带我们生成签名（活命令树自适应
+/// 生成行，oma 与 hst 两代都含）才删整目录；用户手改或他源不动。
+fn retire_user_skill(dir: &std::path::Path) -> Option<&std::path::Path> {
+    let md = std::fs::read_to_string(dir.join("SKILL.md")).ok()?;
+    if !md.contains("活命令树自适应生成") {
+        return None;
+    }
+    std::fs::remove_dir_all(dir).ok()?;
+    Some(dir)
 }
 
 /// `hst diagnose cache|agents`：活性诊断族（D21）。打真 API、烧最小 token。

@@ -5,8 +5,8 @@
 
 ## 当前目标：D49 技能名翻 hst 加旧名兼容窗
 
-> 用户裁 2026-09-14「走」（D14/D22/D45 旧牌保留裁定的翻案）。依据：PRD D49；D29 至 D45 兼容窗模式（旧名双写一个 minor 窗口后清扫）。三段：
+> 用户裁 2026-09-14「走」立项（第 1 轮带兼容窗），同日第 2 轮令「老的 ohmyagents 应该删除啊」取消兼容窗：旧牌直接删除加幂等退役。依据：PRD D49 第 2 轮；ours 识别沿 write_skill marker 家族。三段：
 
-1. **skillgen 双名渲染（src\skillgen.rs）**：`render_skill_as(name, cta)` 单体渲染，canonical `render_skill`（name = hst）加 `render_skill_legacy`（name = ohmyagents、description 首带「旧牌兼容窗至 1.2.0，建议改用 hst 技能」CTA）；常量 SKILL_NAME / SKILL_NAME_LEGACY / SKILL_LEGACY_CTA 供 main 与窗口期引用。
-2. **双写落盘（src\main.rs 加 src\deploy.rs）**：用户级 `hst skill --write` 写 `~/.claude/skills/hst/` 加 `~/.claude/skills/ohmyagents/`（marker `skill.wrote` 两行，兼容行带 `(compat)` 尾注）；项目级 `deploy_skills` 四处（.agents/.claude/.grok/.kimi-code）各写 canonical 加兼容双份，`write_skill` 体由调用方传入（判等与覆写各对各的体，用户手改跳过语义不动）；`deploy_kimi_project` 布局面随 canonical；仓自有源目录翻新：新增 `.agents/skills/hst` 为 canonical，旧 `ohmyagents` 目录改兼容体保留（窗口双写本就两目录都在）。
-3. **测试与文档**：skillgen 断言翻 hst 加 legacy 双断言（name 加 CTA）；deploy 集成断言四处 canonical 在位加兼容体 CTA；门禁全绿加 dogfood（用户级与项目级双技能落位实弹）；文档四处同步（AGENTS 意图路由行、R002 skill 行、INDEX skillgen 行、main.rs 命令注释）；TODO 队列登记 1.2.0 摘双写加清扫；codex 评审对齐后推 main（封版时点另裁）。
+1. **skillgen 单名渲染（src\skillgen.rs）**：`render_skill` 唯一名 hst（第 2 轮删 legacy 渲染与常量）。
+2. **单写加退役（src\main.rs 加 src\deploy.rs）**：用户级 `hst skill --write` 只写 `~/.claude/skills/hst/`，旧牌目录幂等退役（生成签名识别，打 `skill.retired=`）；项目级 `deploy_skills` 四处（.agents/.claude/.grok/.kimi-code）各写 `skills/hst/`，旧牌 ours 目录（marker 家族识别）退役打 `(retired)`，用户手改或他源不动；仓自有 `.agents/skills/ohmyagents` 跟踪件删除。
+3. **测试与文档**：skillgen 断言唯一名；deploy 集成断言四处 hst 在位加旧牌 ours 目录退役加用户手改保留；门禁全绿加 dogfood（退役实弹）；文档四处同步（AGENTS 意图路由行、R002 skill 行、INDEX 三行、main.rs 命令注释）随第 2 轮口径重写；codex 评审对齐后推 main（封版时点另裁）。

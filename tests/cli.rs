@@ -338,14 +338,23 @@ fn init_full_deploys_hooks_skills_and_yolo() {
         "kimi user-level [[hooks]] registered (D28): {kimi_user}"
     );
     // 项目面：skills 与说明仍在项目；hook 注册不再落项目（D28 退役）。
+    // D49：canonical 技能目录翻 hst，旧牌 ohmyagents 目录被退役删除。
     for rel in [
-        ".agents/skills/ohmyagents/SKILL.md",
-        ".kimi-code/skills/ohmyagents/SKILL.md",
+        ".agents/skills/hst/SKILL.md",
+        ".kimi-code/skills/hst/SKILL.md",
         "CLAUDE.md",
         "AGENTS.md",
     ] {
         assert!(proj.join(rel).exists(), "missing project {rel}");
     }
+    assert!(
+        !proj
+            .join(".agents")
+            .join("skills")
+            .join("ohmyagents")
+            .exists(),
+        "legacy ohmyagents skill dir must be retired (D49 r2)"
+    );
     // D28 第 2 轮：hook 与 yolo 面全量用户级，项目 .claude/settings.json
     // 与 .codex/hooks.json 都不再创建；yolo 键落四家用户配置。
     assert!(

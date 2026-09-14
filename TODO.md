@@ -4,13 +4,13 @@
 
 ## 当前目标
 
-D49 技能名翻 hst 加旧名兼容窗（2026-09-14 立项，用户裁「走」翻案旧牌保留）：
+D49 技能名翻 hst 旧牌直接删除（2026-09-14 立项；第 2 轮用户裁定取消兼容窗）：
 
-- [x] skillgen 双名渲染（render_skill_as 单体加 canonical hst 加 legacy ohmyagents 带 CTA；三常量导出）
-- [x] 用户级双写（cmd_skill：~/.claude/skills/hst/ 加 ohmyagents/，兼容行 marker 带 compat 尾注）
-- [x] 项目级四处双写（deploy_skills：.agents/.claude/.grok/.kimi-code 各 canonical 加兼容；write_skill 体参化；deploy_kimi_project 随 canonical；仓自有源目录翻新：新增 hst 为 canonical 加旧 ohmyagents 改兼容体保留）
+- [x] skillgen 单名渲染（canonical hst；第 2 轮删 legacy 渲染与常量）
+- [x] 用户级单写加退役（cmd_skill：~/.claude/skills/hst/；旧牌目录幂等退役打 skill.retired，用户手改跳过）
+- [x] 项目级四处单写加退役（deploy_skills：.agents/.claude/.grok/.kimi-code 各 skills/hst/；旧牌 ours 目录幂等退役 (retired)；write_skill 体参化；仓自有 .agents/skills 旧牌件删除）
 - [x] 测试与门禁（skillgen 断言翻新加 legacy 双断言、deploy 集成断言四处双写；177 单测加 28 集成绿、fmt、md 四件套）
-- [x] dogfood（用户级双技能落位实弹、本会话技能列表双技能刷新可见、init 重生项目八面）
+- [x] dogfood（用户级与项目级旧牌退役实弹：skill.retired 与四处 (retired) marker、各目录只剩 hst、外来 herdr 不动）
 - [x] 文档四处同步（AGENTS 意图路由行、R002 skill 行、INDEX skillgen 行、main.rs 命令注释）
 - [x] codex 评审对齐后推 main（1ad0685 加 74b8e1c CI 绿，F1 至 F3 全收；封版时点另裁；1.2.0 摘兼容双写加清扫已入队列）
 
@@ -49,7 +49,6 @@ D31 至 D45 前目标（2026-09-13 ohmycloud 协调批与状态栏 HUD 迭代五
 
 - [ ] G2 补钉：kimi / grok 运行时退单排的 pwsh 闸门断言（codex D40 评审记下批，不阻塞；D42 三行测试已顺带钉 kimi 并一行，剩 grok）
 - [ ] D47 后续（codex 评审 F3，不阻断）：host_asset_name 与 host_keywords 抽 (os, arch) 取参纯函数去 cfg!，linux CI 恢复全平台资产名字面量断言
-- [ ] 1.2.0 摘 ohmyagents 技能兼容双写加清扫（D49 兼容窗终点：用户级与项目级旧牌目录、skillgen legacy 渲染与 deploy 双写面一并退役，沿 D29 至 D45 模式）
 - [ ] D48 后续（codex 评审 F3，不阻断）：run 的读序分支收束（mirror-first 失败后 GitHub 再失败不回环、DefaultFallback 才触发回退）补假基址集成断言，钉「不回环」性质（现仅两轮真网 e2e 佐证）
 - [x] stable 封版时随批发版把 README 安装直链与镜像注释从 msvc 名翻 gnu 名（codex 评审 F4，v1.1.5 封版落地：直链与镜像注释与 Move-Item 路径三处全翻）
 
