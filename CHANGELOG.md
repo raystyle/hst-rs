@@ -104,6 +104,10 @@
 - **hst 版本线重开 v1.0.0**（D34，用户裁 2026-09-13）：hst 版本号重新算起，不接 oma 老项目版本线；本版起 HST 线从 1.0.0 起算（与 ark 1.0.0 同语义开山版），本文件此前 oma 0.x 与 v0.6.x 各节一律读作**更名过渡期记录**；镜像 hst/stable 滚动照旧。
 - **ohmycloud 协调批**（D31 至 D33 加 D35 / P0048）：私有网关域名全仓清扫（diagnose 注释加 README / R002 / P0041 脱敏，表述统一「api 缓存回归测试端点（配置注入）」；端点本就 env 加 agent 配置注入无硬编码，逻辑不动）；init 旗标连字符化 `--pre-trust`（旧 `--pretrust` 隐藏别名兼容到 1.1.0 兼容窗与 OMA_* env 同批清，kv 标记 `init.pretrust.*` 冻结不动，全仓 md 28 处随函更正含历史档案）；yolo 分级关闭 `--yolo[=full|partial|off]` 与 `--project-yolo[=级别]`（裸旗标兼容、级别缺省 full；partial 危险操作仍确认：claude `acceptEdits`、codex `workspace-write`/`on-request`、kimi `auto`、grok `auto`（grok-build `permissions.rs` canonical 值集实证，S007 缺口收口）；partial 摘 ours 落的 enableAll（同批或重跑 `--pre-trust` 会再开；名单混 agent 原生用户审批无法归因一律保留）；off 按 ours 等值摘除（新用户级 retire 面，值集含 full 与 partial 两代，用户自设值保留空文件删除）；doctor 判据分级接受不再误报、冲突 CTA 带 `=<level>`；marker 只增 `init.yolo.level` 与 `init.retired`）；README 精简重写专注安装部署使用加 GitHub 仓库描述一句话（D35，canonical 仓名 `hst_rs`）。herdr codex 三轮独立评审达成一致后封版；160 单测加 27 集成与四门禁全绿；本仓 dogfood init 四处 SKILL 再生与用户级技能刷新。
 
+### 里程碑 2026-09-14
+
+- **Windows 构建切 gnu 交叉编译 v1.1.5**（D47，用户裁摆脱 VC，stable 切 gnu 封版）：CI 的 windows-latest msvc 岗换 ubuntu-latest 交叉岗（apt mingw-w64 条件步、Test 交叉岗跳过由 linux/mac 双岗覆盖、Package 后缀改判 triple），Windows 资产名改 `hst-<arch>-pc-windows-gnu.zip`（CRT 静态零 DLL 依赖，12.1MB 与 msvc 同量级，ohmycloud 裸环境交叉与 lan-win 实弹双实证）；`hst self update` 关键词梯子 `windows-gnu > windows-msvc > windows`（新源选 gnu、旧 release msvc-only 回落、通用词保底旧 msvc 二进制升级）；codex 复核四发现全收（S028 D47 追记、INDEX 标签、cfg 断言 CI 盲区记 TODO、README gnu 翻名随本封版落地）；herdr 共存实证同日落档（S035，状态栏 unknown 非冲突定性）。
+
 ### 排后
 
 - Linux/mac 接管（P0012 跨平台面）：资产与代码路径就绪；指令集 SIGILL 预备检测研究已备（S021）。

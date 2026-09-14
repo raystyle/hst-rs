@@ -13,10 +13,10 @@ hst 不做编排、不管 token 注入（密钥安全归 [ohmypwsh]）；agent �
 ### Windows
 
 ```powershell
-# 最新正式版（镜像直下把 URL 换 https://env.ohmygh.com/hst/stable/hst-x86_64-pc-windows-msvc.zip）
-Invoke-WebRequest https://github.com/raystyle/hst_rs/releases/latest/download/hst-x86_64-pc-windows-msvc.zip -OutFile hst.zip
+# 最新正式版（镜像直下把 URL 换 https://env.ohmygh.com/hst/stable/hst-x86_64-pc-windows-gnu.zip）
+Invoke-WebRequest https://github.com/raystyle/hst_rs/releases/latest/download/hst-x86_64-pc-windows-gnu.zip -OutFile hst.zip
 Expand-Archive hst.zip -DestinationPath $HOME\.hst\bin
-Move-Item $HOME\.hst\bin\hst-x86_64-pc-windows-msvc\hst.exe $HOME\.hst\bin\
+Move-Item $HOME\.hst\bin\hst-x86_64-pc-windows-gnu\hst.exe $HOME\.hst\bin\
 # 把 $HOME\.hst\bin 加进 PATH 后重开终端
 hst --version
 ```
