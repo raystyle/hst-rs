@@ -12,7 +12,7 @@ D47 Windows 构建切 gnu 交叉编译（2026-09-14 立项，摆脱 VC）：
 - [x] 本机交叉复验（mingw 一次过，PE32+ console x86-64，12.13MB 与 ohmycloud 实证同量级）
 - [ ] 门禁（cargo test --locked 全绿、md 四件套）
 - [x] 四原语与文档同步（PRD D47、GOAL 起点锚点进程、PLAN、本清单；随 codex 评审 F1/F2 补 S028 D47 追记与 INDEX update.rs 行标签）
-- [ ] 提交推 main、CI 绿与 dev release gnu 资产名回报（不动版本号、不推 tag）
+- [x] 提交推 main、CI 绿与 dev release gnu 资产名回报（6995cb3 加 11fffa5；run 34840283806 六岗全绿，dev 六资产 windows 位 hst-x86_64-pc-windows-gnu.zip，镜像 hst/dev 到货；未动版本号未推 tag，herdr 回执 ohmycloud 已发）
 
 D46 状态栏 agent 版本段（2026-09-13 立项，v1.1.4 方向）：
 
