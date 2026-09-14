@@ -167,6 +167,7 @@
 | S032 | `S032-GitHub发版与分支合并标准流程调研.md` | 三分支模型、合并三式、分支保护与发版自动化选型；本仓适用结论 |
 | S033 | `S033-四家agent无头模式hook触发与状态栏渲染矩阵.md` | D17 前置：无头入口、hook 触发、状态栏渲染四行矩阵；状态栏无头四家均不可验，判据须两层分离 |
 | S034 | `S034-状态栏HUD流行设置与多行context构成.md` | D36 前置：ccstatusline/CCometixLine 等流行 HUD 盘点、官方 stdin JSON 契约（context_window 与多行）、MCP/tools 计数数据源缺口与设计候选 |
+| S035 | `S035-herdr与hst的hook注册共存实证.md` | 状态栏 unknown 兜底非冲突：herdr 安装器外来保留取证（装机 v9 matcher 星号对上游 v10 收窄）、hst merge 双向共存落地、跨侧注册搬家 shim-dead 与重跑 init 自愈 |
 
 ## 六、开发测试参考
 
