@@ -1586,10 +1586,10 @@ pub fn deploy_all_with(
     // `<根>/statusline/`），不是用户家目录；merge_* 内部自取 user_home。
     // 内容判等幂等：脚本与配置无变化时零写入零输出，init 重跑安静。
     crate::statusline::deploy_script(oma)?;
-    crate::statusline::merge_claude(oma)?;
-    crate::statusline::merge_codex(oma)?;
-    crate::statusline::merge_kimi(oma)?;
-    crate::statusline::merge_grok(oma)?;
+    crate::statusline::merge_claude(oma, user_home)?;
+    crate::statusline::merge_codex(oma, user_home)?;
+    crate::statusline::merge_kimi(oma, user_home)?;
+    crate::statusline::merge_grok(oma, user_home)?;
     Ok(report)
 }
 
@@ -1629,14 +1629,31 @@ mod tests {
         )
         .unwrap();
         assert!(settings.get("statusLine").is_some(), "bar config merged");
-        // 幂等：再跑脚本内容与 mtime 不动。
-        let meta_before = fs::metadata(&script).unwrap().modified().unwrap();
+        // 幂等：再跑脚本与四家配置 mtime 全不动（codex F2：claude 与 codex
+        // 写入也须内容判等）。
+        let cfgs = [
+            user.join(".claude").join("settings.json"),
+            user.join(".codex").join("config.toml"),
+            user.join(".kimi-code").join("tui.toml"),
+            user.join(".grok").join("config.toml"),
+        ];
+        let before: Vec<_> = std::iter::once(fs::metadata(&script).unwrap().modified().unwrap())
+            .chain(
+                cfgs.iter()
+                    .map(|c| fs::metadata(c).unwrap().modified().unwrap()),
+            )
+            .collect();
         std::thread::sleep(std::time::Duration::from_millis(20));
         deploy_all_with(&root, &user, &oma, host_side()).unwrap();
+        let after: Vec<_> = std::iter::once(fs::metadata(&script).unwrap().modified().unwrap())
+            .chain(
+                cfgs.iter()
+                    .map(|c| fs::metadata(c).unwrap().modified().unwrap()),
+            )
+            .collect();
         assert_eq!(
-            fs::metadata(&script).unwrap().modified().unwrap(),
-            meta_before,
-            "content-equal rerun must not touch mtime"
+            before, after,
+            "content-equal rerun must not touch any mtime"
         );
         // 自备脚本 marker：init 不覆盖用户定制。
         fs::write(&script, "# user custom bar\n").unwrap();

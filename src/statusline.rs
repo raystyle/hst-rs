@@ -1228,11 +1228,10 @@ pub fn restore_builtin_script(home: &Path) -> Result<PathBuf, String> {
 }
 
 /// claude：settings.json 幂等合并 statusLine（只覆盖该键）。
-pub fn merge_claude(home: &Path) -> Result<String, String> {
+/// D53（codex F1）：user_home 显式透传（测试密闭，不读 env）。
+pub fn merge_claude(home: &Path, user_home: &Path) -> Result<String, String> {
     let script = deploy_script(home)?;
-    let settings = crate::pathutil::user_home()?
-        .join(".claude")
-        .join("settings.json");
+    let settings = user_home.join(".claude").join("settings.json");
     let mut v: serde_json::Value = if settings.exists() {
         let text = std::fs::read_to_string(&settings)
             .map_err(|e| format!("{}: {e}", settings.display()))?;
@@ -1248,18 +1247,20 @@ pub fn merge_claude(home: &Path) -> Result<String, String> {
     );
     v["statusLine"] = json!({ "type": "command", "command": cmd });
     let body = serde_json::to_string_pretty(&v).map_err(|e| e.to_string())? + "\n";
-    std::fs::write(&settings, body).map_err(|e| format!("{}: {e}", settings.display()))?;
+    // D53（codex F2）：内容判等幂等（init 重跑不搅 mtime）。
+    if std::fs::read_to_string(&settings).ok().as_deref() != Some(body.as_str()) {
+        std::fs::write(&settings, body).map_err(|e| format!("{}: {e}", settings.display()))?;
+    }
     Ok(settings.display().to_string())
 }
 
 /// kimi：`~/.kimi-code/tui.toml` `[status_line]` 表幂等合并（command 串经
 /// cmd/sh 执行，首行接管 footer；300ms 超时由 kimi 侧约束，超时自动回退
 /// 内置布局——S025）。其它表保留。
-pub fn merge_kimi(home: &Path) -> Result<String, String> {
+/// D53（codex F1）：user_home 显式透传。
+pub fn merge_kimi(home: &Path, user_home: &Path) -> Result<String, String> {
     let script = deploy_script(home)?;
-    let config = crate::pathutil::user_home()?
-        .join(".kimi-code")
-        .join("tui.toml");
+    let config = user_home.join(".kimi-code").join("tui.toml");
     let script_str = script.display().to_string().replace('\\', "/");
     let mut toml = read_toml(&config)?;
     if apply_kimi_status_line(&mut toml, &script_str)? {
@@ -1292,11 +1293,10 @@ fn apply_kimi_status_line(toml: &mut toml::Value, script_str: &str) -> Result<bo
 /// grok：`~/.grok/config.toml` `[ui.status_line]` 幂等合并（type=command）。
 /// Windows 写 `.cmd` 单路径（M048）；Unix 仍写 `pwsh -File` 命令行（NotFound
 /// 才回落 sh -c）。其它表保留。
-pub fn merge_grok(home: &Path) -> Result<String, String> {
+/// D53（codex F1）：user_home 显式透传。
+pub fn merge_grok(home: &Path, user_home: &Path) -> Result<String, String> {
     let script = deploy_script(home)?;
-    let config = crate::pathutil::user_home()?
-        .join(".grok")
-        .join("config.toml");
+    let config = user_home.join(".grok").join("config.toml");
     let script_str = script.display().to_string().replace('\\', "/");
     let mut toml = read_toml(&config)?;
     if apply_grok_status_line(&mut toml, &script_str)? {
@@ -1455,15 +1455,14 @@ fn strip_tui_section(text: &str) -> String {
 /// Does not deploy the pwsh script; Codex has no command-backed status line.
 /// `[codex] items`（D18）用户清单原样透传：codex 对未知 id 静默跳过，hst
 /// 不校验清单合法性；键缺省回落内嵌推荐八项。
-pub fn merge_codex(home: &Path) -> Result<String, String> {
+/// D53（codex F1）：user_home 显式透传。
+pub fn merge_codex(home: &Path, user_home: &Path) -> Result<String, String> {
     let cfg = read_config(home)?;
     let items: Vec<&str> = match &cfg.codex_items {
         Some(list) => list.iter().map(String::as_str).collect(),
         None => CODEX_STATUS_LINE_ITEMS.to_vec(),
     };
-    let config = crate::pathutil::user_home()?
-        .join(".codex")
-        .join("config.toml");
+    let config = user_home.join(".codex").join("config.toml");
     let existing = if config.exists() {
         std::fs::read_to_string(&config).map_err(|e| format!("{}: {e}", config.display()))?
     } else {
@@ -1479,7 +1478,10 @@ pub fn merge_codex(home: &Path) -> Result<String, String> {
     if let Some(dir) = config.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
-    std::fs::write(&config, body).map_err(|e| format!("{}: {e}", config.display()))?;
+    // D53（codex F2）：内容判等幂等（init 重跑不搅 mtime）。
+    if std::fs::read_to_string(&config).ok().as_deref() != Some(body.as_str()) {
+        std::fs::write(&config, body).map_err(|e| format!("{}: {e}", config.display()))?;
+    }
     Ok(config.display().to_string())
 }
 

@@ -464,6 +464,7 @@ fn cmd_agents_statusline(
         return Ok(());
     }
     let home = install::hst_home()?;
+    let user_home = hst::pathutil::user_home()?;
     let supported = ["claude", "codex", "kimi", "grok"];
     let do_all = names.is_empty();
     let unknown: Vec<String> = names
@@ -484,19 +485,19 @@ fn cmd_agents_statusline(
         hst::statusline::restore_builtin_script(&home)?;
     }
     if do_all || names.iter().any(|n| n == "claude") {
-        let p = hst::statusline::merge_claude(&home)?;
+        let p = hst::statusline::merge_claude(&home, &user_home)?;
         println!("statusline.claude={p}");
     }
     if do_all || names.iter().any(|n| n == "codex") {
-        let p = hst::statusline::merge_codex(&home)?;
+        let p = hst::statusline::merge_codex(&home, &user_home)?;
         println!("statusline.codex={p}");
     }
     if do_all || names.iter().any(|n| n == "kimi") {
-        let p = hst::statusline::merge_kimi(&home)?;
+        let p = hst::statusline::merge_kimi(&home, &user_home)?;
         println!("statusline.kimi={p}");
     }
     if do_all || names.iter().any(|n| n == "grok") {
-        let p = hst::statusline::merge_grok(&home)?;
+        let p = hst::statusline::merge_grok(&home, &user_home)?;
         println!("statusline.grok={p}");
     }
     // The bar renders through pwsh on every platform; without it the merged
