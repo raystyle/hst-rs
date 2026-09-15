@@ -4,6 +4,13 @@
 
 ## 当前目标
 
+D51 状态栏第一行 clock 段（2026-09-15 立项，第 2 轮裁分钟精度）：
+
+- [x] clock 段（SEG_CLOCK：Get-Date `yyyy-MM-dd HH:mm` 零子进程；模板 `{icon}{datetime}` 加 clock 图标键；缺省第一行行尾）
+- [x] 测试与 dogfood（默认序含 clock 断言、Get-Date 格式断言；181 单测加 28 集成绿；本机实弹 `󰥔 2026-09-15 13:22`）
+- [ ] 文档（R002 状态栏行、INDEX 已落）加 codex 评审对齐后推 main
+- [ ] 随 v1.2.0 封版（版本加 lock 加 CHANGELOG，tag 后四件回执）
+
 D50 doctor yolo 诊断面补 bypass 残余阻塞信号（2026-09-15 立项，S029 追记候选转正）：
 
 - [x] 既有 yolo 检查语义修正（项目层补 settings.local.json 读取；项目层 bypass 按 2.1.257 忽略语义：bypass-only 判 warn、不构成对用户层遮蔽即不进 conflict 臂，codex F3）

@@ -133,6 +133,18 @@ if ($dir) {
 }
 "#;
 
+/// clock 段（D51）：第一行年月日与当前时间。Get-Date 本机取时零子进程；
+/// 刷新时机随状态栏渲染事件（不独立走秒）；用户级 `{datetime}` 占位与
+/// `clock` 图标键可定制。
+const SEG_CLOCK: &str = r#"
+# ── clock 段：年月日 + 当前时间（D51；Get-Date 零子进程）──
+$dt = (Get-Date -Format 'yyyy-MM-dd HH:mm')
+if ($dt) {
+    $ck = Seg (ApplyFmt (Tmpl 'clock') @{ icon = (Ico 'clock'); datetime = $dt }) '38;5;245'
+    if ($ck) { $parts.Add($ck) }
+}
+"#;
+
 /// hst 段（D45 更名，原 oma 段）：当前 agent 名 + 实时四态（hook 状态通
 /// 道与会话闸，机读标记 S025；D28 用户级 session 分键读序）。
 const SEG_OMA: &str = r#"
@@ -742,6 +754,7 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
         "tokens" => SEG_TOKENS,
         "duration" => SEG_DURATION,
         "git" => SEG_GIT,
+        "clock" => SEG_CLOCK,
         "package" => SEG_PACKAGE,
         "python" => SEG_PYTHON,
         "rust" => SEG_RUST,
@@ -757,7 +770,7 @@ fn segment_block(id: &str) -> Result<&'static str, String> {
 /// 包版本与工具链尾巴（环境与项目同线，D18/D42 的 shell 领首惯例回归）。
 /// D18 定制面 `segments` 键缺省回落此序。
 pub(crate) const DEFAULT_SEGMENTS: &[&str] = &[
-    "shell", "dir", "git", "package", "python", "rust", "node", "zig", "go", "cpp",
+    "shell", "dir", "git", "package", "python", "rust", "node", "zig", "go", "cpp", "clock",
 ];
 
 /// 默认第二行「agent 状态」（D43 精修、D45 段更名 hst）：agent 态 / 模型
@@ -787,6 +800,7 @@ const DEFAULT_TEMPLATES: &[(&str, &str)] = &[
     ("tokens-ascii", "{used}/{window}"),
     ("duration", "{icon}{duration}"),
     ("git", "{branch}{flags}"),
+    ("clock", "{icon}{datetime}"),
     ("package", "{icon}{version}"),
     ("python", "{icon}{version}"),
     ("rust", "{icon}{version}"),
@@ -818,6 +832,7 @@ const DEFAULT_ICONS: &[(&str, &str)] = &[
     ("zig", "\u{e6a9} "),
     ("go", "\u{e627} "),
     ("cpp", "\u{e646} "),
+    ("clock", "\u{f0954} "),
 ];
 
 /// 配置块的取用与占位替换助手（随烘焙块注入，紧跟 HEAD）。
@@ -1495,6 +1510,22 @@ mod tests {
             "not an array"
         );
         assert!(parse_config("segments = [1]\n").is_err(), "not strings");
+    }
+
+    #[test]
+    fn clock_segment_default_line1_with_full_datetime() {
+        // D51：clock 段入默认第一行行尾（工具链尾巴之后恒右置），格式
+        // yyyy-MM-dd HH:mm（Get-Date 零子进程，分钟精度）；模板与图标键可定制。
+        assert_eq!(DEFAULT_SEGMENTS.last(), Some(&"clock"));
+        let ps1 = default_statusline_ps1();
+        assert!(
+            ps1.contains("Get-Date -Format 'yyyy-MM-dd HH:mm'"),
+            "clock uses local Get-Date with minute precision"
+        );
+        assert!(ps1.contains("{icon}{datetime}"), "clock template default");
+        let ck = ps1.find("# ── clock 段").unwrap();
+        let cp = ps1.find("# ── Python 工具链").unwrap();
+        assert!(ck > cp, "clock block sits after the line-1 tail probes");
     }
 
     #[test]
