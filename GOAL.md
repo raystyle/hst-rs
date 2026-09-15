@@ -28,6 +28,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-15 | **D53 交付（init 并入状态栏面）**：deploy_all 尾部并入 deploy_script 加四家 merge（home 形参 hst 根，第一版传错被测试抓出）；deploy_script 与 grok cmd 加 claude 与 codex 写入全面内容判等幂等；codex F1（merge 显式 user_home 透传修测试缝泄漏，测试改真机配置的暗病连根拔）F2（claude 与 codex 写入判等加四配置 mtime 断言）F3（面扩张舰队知会）；verify live 搅真机 mtime 系 D28 既有设计非回归；185 单测加 28 集成绿；d04ed1c 加 82fa3e0 推 main CI 绿，舰队回执已发 |
 | 2026-09-15 | **D52 铁证根修（宿主反例三轮收敛）**：宿主全量 marker 复现排除 off 假说，(retired-yolo) 三文件足迹指向 deploy_all 项目级退役趟；Linux root==home 确定性复现定案（家目录 cwd 时项目退役趟洗用户键）；修复 = deploy_all 家目录守卫（same_location 提 pathutil 共享）加 --project-yolo 显式支同罩（codex F1）；184 单测加 28 集成绿；be0f42c 加 42ad265 推 main CI 绿；舰队解禁回执已发 |
 | 2026-09-15 | **D52 交付（宿主两报修复）**：归因复现修正（init 对 BOM 响亮报错零改写，宿主现象系 BOM 假报 missing 误读）；读侧 BOM 容忍全覆盖（json 加 toml 五路）、yolo full 双面落 blockReads=false 加 off 对称摘、doctor yolo.parse 显式报（UTF-16 判 Bad、坏文件行不假报 missing）；codex F1 至 F4 全收后推 main（dc7cdca 加 31f9ca5）CI 绿；宿主场景重放实证；herdr 回执 ohmycloud 已发 |
 | 2026-09-15 | **D51 交付与 v1.2.0 封版**：codex F1 至 F3 全收（example 模板同步 clock、R002 占位符清单、Get-Date 冒号转义钉 ASCII 防区域文化替换）后推 main（c563ffa 加 7823698）；随封版令 v1.2.0（D48 至 D51 攒批，09495e9 tag）run 34933356902 六岗绿、六资产 gnu 族 digest 三方对账全等、镜像 hst/stable curl 200 全复验、herdr 知会 ohmycloud pin 素材 |
