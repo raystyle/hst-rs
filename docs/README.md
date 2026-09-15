@@ -39,4 +39,10 @@ PRD 条目对应 REQ；PLAN/TODO 对应 REQ 的 Criteria 与 trace；GOAL 定位
 
 ### 存量禁字债口径
 
-`check.py` PE-11 对历史档案（diary 与 proven 存量、约五百行破折号与箭头）豁免，沿 G005 旧 SKIP 先例（自家 mdcharlint 与 rumdl 的豁免面一致）；活跃面（AGENTS、adr、requirements、guides、research、根 README 与地图）零容忍，新文件违规即修。
+PE-11 历史档案豁免走 `PEVO_CHECK_ALLOW` 机制（分号分隔正则，匹配 `docs/` 下 `相对路径:行`，命中报 SKIP 带处数；根三件 AGENTS/README/CHANGELOG 永不受益）。本仓标准命令：
+
+```bash
+PEVO_CHECK_ALLOW='^docs/diary/2026-08-31-;^docs/diary/2026-09-01-;^docs/diary/2026-09-02-;^docs/diary/2026-09-03-;^docs/proven/'   uv run /mnt/d/ProjectEvo/plugins/project-evo/skills/dev-evo/scripts/check.py .
+```
+
+覆盖历史档案面（diary 四篇加 proven 存量整目录；存量清偿后逐步收缩正则）；活跃面（AGENTS、adr、requirements、guides、research、根 README 与地图）零容忍，新文件违规即修。

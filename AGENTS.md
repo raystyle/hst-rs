@@ -9,7 +9,7 @@
 - `uv run --script .tools/md-ref-scan.py` 断链回归（结构变更必跑）
 - `uv run --script .tools/md-heading-scan.py` 加 `uv run --script .tools/mdcharlint.py` 加 `rumdl check .` md 门禁
 - `cargo build --release --locked --target x86_64-pc-windows-gnu --bins` Windows 交叉构建
-- `uv run /mnt/d/ProjectEvo/plugins/project-evo/skills/dev-evo/scripts/check.py .` 骨架合规自检（PE-11 历史档案豁免，口径见 docs/README）
+- `PEVO_CHECK_ALLOW` 加 `uv run /mnt/d/ProjectEvo/plugins/project-evo/skills/dev-evo/scripts/check.py .` 骨架合规自检（豁免正则与标准命令见 docs/README 存量禁字债口径节）
 - `./target/debug/hst doctor` 本机体检；`./target/debug/hst init` dogfood 部署
 
 ## Must
