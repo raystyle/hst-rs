@@ -65,6 +65,10 @@
 
 2.1.2xx 无未结的「bypass 仍提示」回归条目；相关集 = 2.1.271、2.1.257、2.1.248（`--restricted` 拒 bypass）、2.1.223（代理 bypass 须守组织禁用）、2.1.208、2.1.196；早期 = 2.1.157 加 2.1.97（沙箱网络提示自 2.1.97 起 bypass/auto 自动批）、2.1.110、2.0.71 [实证： anthropics/claude-code CHANGELOG main]。
 
+### 宿主实弹案例与 D52 修复
+
+- [实证： ohmycloud 2026-09-15 lan-win] yolo.readblock warn 在真机定位到实案（读块键导致的残余阻塞被 doctor 直接点名，正面价值已验）；另报 init「洗键」经我方沙箱复现修正归因：1.2.0 对 BOM 文件是响亮报错零改写、无 BOM 合并语义正确，宿主现象系 BOM 致 doctor 假报 missing 被误读；修复走 D52（读侧 BOM 容忍 + yolo full 落 blockReads=false + doctor yolo.parse 显式报）。
+
 ### hst 落点评估与待办
 
 - hst yolo full 三键（bypass 用户层加 skipDangerousModePermissionPrompt 加 enableAllProjectMcpServers）已盖：一次性 dangerous 框、MCP 审批框（双在场条件）、`.mcp.json` 全批；用户层 bypass 不受 2.1.257 项目层忽略影响 [实证： yolo.rs 写入面对照本清单]。

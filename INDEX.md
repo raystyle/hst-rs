@@ -32,8 +32,8 @@
 | `src\archive.rs` | 通用归档工具：sha256 校验、zip / tar.gz 解包、目录复制、host os/arch（D15 自 rmux.rs 剥离） |
 | `src\hook.rs` | `hst hook`：事件到四态映射与用户级 session 分键 state 落盘（D28），加密钥拦截分流 |
 | `src\agents.rs` | `hst agents`：PATH / 环境变量 / 默认目录探测 |
-| `src\doctor.rs` | `hst doctor`：只读诊断（yolo / 信任 / 二进制 / 登录态 / hook 形态 / 状态栏 / 用户级与项目级状态面，D28；会话健康随 D15 移除；D50 yolo 面补 bypass 残余阻塞信号：项目层 local 优先读取、项目层 bypass-only 假阳性修正、yolo.ask 与 yolo.readblock 检查） |
-| `src\yolo.rs` | `hst init --yolo[=full|partial|off]`：四家分级落盘、ours 退役（用户级与项目级）与 pretrust（D33） |
+| `src\doctor.rs` | `hst doctor`：只读诊断（yolo / 信任 / 二进制 / 登录态 / hook 形态 / 状态栏 / 用户级与项目级状态面，D28；会话健康随 D15 移除；D50 yolo 面补 bypass 残余阻塞信号：项目层 local 优先读取、项目层 bypass-only 假阳性修正、yolo.ask 与 yolo.readblock 检查；D52 yolo.parse 显式报加 json_file BOM 容忍） |
+| `src\yolo.rs` | `hst init --yolo[=full|partial|off]`：四家分级落盘、ours 退役（用户级与项目级）与 pretrust（D33）；D52 full 落 blockReads=false 加 off 等值摘、read_json BOM 容忍） |
 | `src\deploy.rs` | `hst init` hook/skill 部署层：hook 注册四家用户级（D28：claude/codex/grok/kimi 用户层，codex trusted_hash 预种，kimi `[[hooks]]` 合并），项目级 ours 注册与 shim 退役，幂等合并（M059 无引号正斜杠形态，同形去重）；SKILL.md 由 COMMAND_MAP 命令图生成（标记覆写三态；D49 四处翻 skills/hst/ 加旧牌 ohmyagents 幂等退役） |
 | `src\shim.rs` | D27 自包含状态 shim 加 D28 用户级常驻与 session 分键：hst-state.cmd（jq 首选加 findstr 回落，PATH 探 jq）、hst-state.ps1（D39 sh 兼容载体，Windows 注册指向）、hst-state.sh（bash 或 mac zsh）、grok baked 包装；落 `~/.hst/hooks/`，双写 agent 最新加 session 键，SessionEnd GC |
 | `src\install.rs` | hst 根解析（hst_home）加自管根存量探测（managed_binaries/version）加共享下载件 download_asset（self update 复用）；安装机器已随 D20 删除 |
@@ -41,7 +41,7 @@
 | `src\update.rs` | `hst self update`：dev 滚动源与正式版判新、sha256 取证、Windows rename 舞步（S028）；HST_MIRROR 镜像通道加缓存击穿（D16；D45 资产名钉 hst-*、旧 OMA_MIRROR 读已删；D47 Windows 资产名与关键词切 gnu 带 msvc 回落；D48 双通道镜像腿、缺省 GitHub 失败自动回退默认基址、GH_TOKEN Bearer） |
 | `src\trace.rs` | `hst trace` 六视图：联邦读四家原生会话库归一检索（P0013/P0014，S018/S019/S020；D15 连坐删除，D19 全量恢复） |
 | `src\verify.rs` | `hst agents verify`：四家无头验收两层判据（D17，S033）；状态栏 mock 直跑（D46 标记两形判据加 HST_VER_CACHE_DIR 隔离）加 hook 用户级注册 byte 备份 Drop 还原与 env 隔离判据（D28）；grok trusted_folders 种子加 Drop 摘除 |
-| `src\diagnose.rs` | `hst diagnose cache\|agents`：活性诊断族（D21）：网关发现（env 覆盖大于 claude env 大于 codex provider）、缓存双连探测加 ds 特判、配置指向加在册加 key 活性加 thinking 对照 |
+| `src\diagnose.rs` | `hst diagnose cache\|agents`：活性诊断族（D21）：网关发现（env 覆盖大于 claude env 大于 codex provider）、缓存双连探测加 ds 特判、配置指向加在册加 key 活性加 thinking 对照；D52 claude env 读侧 BOM 容忍） |
 | `src\skillgen.rs` | `hst skill`：从 clap 活命令树自适应渲染 SKILL.md（D22；frontmatter 按 Agent Skills 标准，--write 落用户级技能目录；D49 名翻 hst 唯一名加旧牌幂等退役） |
 | `src\secretguard.rs` | `hst hook` 密钥拦截闸（S030）：模式表八层防误报、实值比对通道、PreToolUse/UserPromptSubmit 阻断 exit 2 |
 | `src\fmtio.rs` | 全局输出三态（kv/json/jsonl）与结构化错误出口（issue #1 契约，R011）；JSON 信封函数（D15 自 api.rs 迁入） |

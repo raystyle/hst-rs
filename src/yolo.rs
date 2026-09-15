@@ -29,10 +29,13 @@ pub(crate) fn read_json(path: &Path) -> Result<Json, String> {
         return Ok(json!({}));
     }
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    // D52：BOM 容忍——舰队 PowerShell 脚本常写 UTF-8 BOM，serde_json 对带
+    // BOM 头整体拒收（doctor 假报 missing、init 硬错），读侧剥 U+FEFF。
+    let text = text.trim_start_matches('\u{feff}');
     if text.trim().is_empty() {
         return Ok(json!({}));
     }
-    serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
+    serde_json::from_str(text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 pub(crate) fn write_json(path: &Path, value: &Json) -> Result<(), String> {
@@ -193,6 +196,14 @@ pub fn apply_user_yolo_level_with(
             .as_object_mut()
             .unwrap()
             .insert("defaultMode".into(), json!(keys.claude_mode));
+        // D52 宿主令：full 落读块关（「非阻塞键落盘」承诺兑现；off 等值
+        // 摘，partial 不动该键）。
+        if level == YoloLevel::Full {
+            permissions.as_object_mut().unwrap().insert(
+                "blockReadsOutsideWorkingDirectories".into(),
+                Json::Bool(false),
+            );
+        }
         obj.insert("skipDangerousModePermissionPrompt".into(), Json::Bool(true));
         if level == YoloLevel::Full {
             // 用户级 enableAll 覆盖所有项目（per-project enabledMcpjsonServers
@@ -537,6 +548,21 @@ pub fn retire_user_yolo_with(user_home: &Path) -> Result<Vec<String>, String> {
                     }
                 }
             }
+            // D52：ours 落的 blockReads=false 等值摘（摘后缺省亦 false，
+            // 语义无差；ours 值集纪律同 skip 键）。
+            if v.get("permissions")
+                .and_then(|p| p.get("blockReadsOutsideWorkingDirectories"))
+                .and_then(|x| x.as_bool())
+                == Some(false)
+            {
+                if let Some(p) = v.get_mut("permissions").and_then(|p| p.as_object_mut()) {
+                    p.remove("blockReadsOutsideWorkingDirectories");
+                    dirty = true;
+                    if p.is_empty() {
+                        v.as_object_mut().unwrap().remove("permissions");
+                    }
+                }
+            }
             let obj = v.as_object_mut().unwrap();
             for key in [
                 "skipDangerousModePermissionPrompt",
@@ -836,6 +862,46 @@ mod tests {
     /// Unique per-call suffix: same-millisecond parallel tests must not
     /// share (and mutually delete) a temp dir.
     static NEXT_TEST_DIR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    #[test]
+    fn bom_settings_roundtrip_and_full_writes_readblock_false() {
+        // D52 宿主实弹回归：舰队 PS 脚本写的 settings.json 带 UTF-8 BOM——
+        // 读侧剥 U+FEFF 后 init/yolo 不再硬错；full 落 blockReads=false（非
+        // 阻塞承诺）；既有键合并不洗；off 等值摘。
+        let home = fresh_dir();
+        std::fs::create_dir_all(home.join(".claude")).unwrap();
+        std::fs::write(
+            home.join(".claude").join("settings.json"),
+            "\u{feff}{\"env\": {\"FOO\": \"bar\"}, \"permissions\": {\"defaultMode\": \"bypassPermissions\", \"blockReadsOutsideWorkingDirectories\": true}}",
+        )
+        .unwrap();
+        apply_user_yolo_with(&home).unwrap();
+        let raw = std::fs::read_to_string(home.join(".claude").join("settings.json")).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(v["env"]["FOO"], "bar", "merge must preserve keys");
+        assert_eq!(
+            v["permissions"]["defaultMode"], "bypassPermissions",
+            "defaultMode kept"
+        );
+        assert_eq!(
+            v["permissions"]["blockReadsOutsideWorkingDirectories"], false,
+            "full flips readblock off (D52)"
+        );
+        // off：ours 落的 false 等值摘（skip 与 enableAll 同摘）。
+        retire_user_yolo_with(&home).unwrap();
+        let v2: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(home.join(".claude").join("settings.json")).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            v2["permissions"]
+                .get("blockReadsOutsideWorkingDirectories")
+                .is_none(),
+            "off removes ours-written readblock false"
+        );
+        assert_eq!(v2["env"]["FOO"], "bar", "retire keeps foreign keys");
+        let _ = std::fs::remove_dir_all(&home);
+    }
 
     fn fresh_dir() -> std::path::PathBuf {
         let p = std::env::temp_dir().join(format!(

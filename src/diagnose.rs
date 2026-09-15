@@ -92,7 +92,8 @@ pub fn claude_env() -> serde_json::Map<String, Value> {
     let Ok(text) = std::fs::read_to_string(path) else {
         return serde_json::Map::new();
     };
-    let Ok(v) = serde_json::from_str::<Value>(&text) else {
+    // D52：BOM 容忍（同 yolo.rs read_json）。
+    let Ok(v) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) else {
         return serde_json::Map::new();
     };
     v.get("env")

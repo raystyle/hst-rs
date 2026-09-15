@@ -60,7 +60,27 @@ impl Diagnosis {
 
 fn json_file(path: &Path) -> Option<Json> {
     let text = fs::read_to_string(path).ok()?;
-    serde_json::from_str(&text).ok()
+    // D52：BOM 容忍（舰队 PS 脚本常写 UTF-8 BOM，serde 整体拒收）。
+    serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()
+}
+
+/// D52：区分「文件不在 / 解析失败 / 解析成功」——解析失败显式报，不再
+/// 假报 missing（宿主实弹：带 BOM 的 settings.json 被 doctor 报 missing
+/// 误导排障）。
+enum JsonFileState {
+    Absent,
+    Bad,
+    Ok(Json),
+}
+
+fn json_file_state(path: &Path) -> JsonFileState {
+    let Ok(text) = fs::read_to_string(path) else {
+        return JsonFileState::Absent;
+    };
+    match serde_json::from_str(text.trim_start_matches('\u{feff}')) {
+        Ok(v) => JsonFileState::Ok(v),
+        Err(_) => JsonFileState::Bad,
+    }
 }
 
 fn toml_file(path: &Path) -> Option<Toml> {
@@ -868,6 +888,24 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
             .and_then(|m| m.as_str())
             .map(str::to_string)
     };
+    // D52：解析失败显式报（BOM 已容忍后的残余防线：真坏文件点名）。
+    for p in [
+        &claude_local_settings,
+        &claude_shared,
+        &home.join(".claude").join("settings.json"),
+    ] {
+        if matches!(json_file_state(p), JsonFileState::Bad) {
+            push_status(
+                &mut findings,
+                "claude",
+                "yolo.parse",
+                Status::Warn,
+                p,
+                "settings file exists but is not valid JSON (check encoding/\
+                 content); hst cannot read its keys",
+            );
+        }
+    }
     let claude_proj_mode = claude_mode_at(&claude_local_settings)
         .map(|m| (m, claude_local_settings.clone()))
         .or_else(|| claude_mode_at(&claude_shared).map(|m| (m, claude_shared.clone())));
@@ -2474,6 +2512,58 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         let _ = fs::remove_dir_all(&both);
         let _ = fs::remove_dir_all(&partial_user);
+    }
+
+    #[test]
+    fn bom_parses_silent_and_garbage_reports_yolo_parse() {
+        // D52：带 BOM 的 settings.json 三面（doctor 判据、readblock 读值）
+        // 全容忍不假报；真坏文件显式 yolo.parse warn 不再报 missing。
+        let _g = crate::pathutil::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let user = temp_root("bom-user");
+        let root = temp_root("bom-proj");
+        let bad = temp_root("bom-bad");
+        for h in [&user, &bad] {
+            fs::create_dir_all(h.join(".claude")).unwrap();
+        }
+        fs::create_dir_all(root.join(".claude")).unwrap();
+        crate::yolo::apply_user_yolo_with(&user).unwrap();
+        // 用户级文件加 BOM（模拟舰队 PS 脚本重写）。
+        let raw = fs::read_to_string(user.join(".claude").join("settings.json")).unwrap();
+        fs::write(
+            user.join(".claude").join("settings.json"),
+            format!("\u{feff}{raw}"),
+        )
+        .unwrap();
+        // 坏文件：正文非法 JSON。
+        fs::write(bad.join(".claude").join("settings.json"), "{not json").unwrap();
+        std::env::set_var("HST_USER_HOME", &user);
+        let d = diagnose(&root).expect("diagnose");
+        std::env::set_var("HST_USER_HOME", &bad);
+        let b = diagnose(&root).expect("diagnose bad");
+        std::env::remove_var("HST_USER_HOME");
+        // BOM 面：yolo 判 ok（不假报 missing）、无 yolo.parse 行。
+        assert_eq!(
+            d.status("claude", "yolo"),
+            Some(Status::Ok),
+            "BOM tolerated"
+        );
+        assert!(
+            !d.findings.iter().any(|f| f.check == "yolo.parse"),
+            "no parse warn for BOM file"
+        );
+        // 坏文件：yolo.parse warn 点名，不静默。
+        let pf = b
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo.parse")
+            .expect("yolo.parse row for garbage file");
+        assert_eq!(pf.status, Status::Warn, "{:?}", pf.detail);
+        assert!(pf.path.ends_with("settings.json"), "{}", pf.path);
+        for h in [user, root, bad] {
+            let _ = fs::remove_dir_all(h);
+        }
     }
 
     #[test]
