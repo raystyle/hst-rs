@@ -67,7 +67,8 @@
 
 ### 宿主实弹案例与 D52 修复
 
-- [实证： ohmycloud 2026-09-15 lan-win] yolo.readblock warn 在真机定位到实案（读块键导致的残余阻塞被 doctor 直接点名，正面价值已验）；另报 init「洗键」经我方沙箱复现修正归因：1.2.0 对 BOM 文件是响亮报错零改写、无 BOM 合并语义正确，宿主现象系 BOM 致 doctor 假报 missing 被误读；修复走 D52（读侧 BOM 容忍 + yolo full 落 blockReads=false + doctor yolo.parse 显式报）。
+- [实证： ohmycloud 2026-09-15 lan-win] yolo.readblock warn 在真机定位到实案（读块键导致的残余阻塞被 doctor 直接点名，正面价值已验）。
+- 宿主「init 洗键」两报归因演进（三次修正，教训在案）：第 1 报疑 init 覆盖，我方复现证伪（无 BOM 合并正确、BOM 下响亮报错零改写）；第 2 报（干净无 BOM 文件仍洗成 permissions={skip:true} 单键）先误归因为 BOM 假报，反例证伪后以**逐字节指纹**定位：受损形态 = `hst init --yolo=off` 在宿主原样文件上的精确产出（retire 摘 defaultMode 加 D52 落的 blockReads==false、不动 permissions 内异位 skip、codex 面只摘不写，三症状同源）[实证： 本机沙箱复现逐键一致]；off 分支不打印 init.scope=full，与宿主引文矛盾，推定包装脚本串联 off 清理趟，待宿主命令行取证结案。D52 修复面（读侧 BOM 容忍 + yolo full 落 blockReads=false + doctor yolo.parse）不受影响照常成立。
 
 ### hst 落点评估与待办
 
