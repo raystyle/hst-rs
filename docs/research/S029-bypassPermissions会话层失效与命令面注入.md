@@ -38,7 +38,9 @@
 
 - [实证： browse-rs 会话截屏] 内联 `python -c` 被「Do you want to proceed?」拦截，文案点名机制：`permissions.blockReadsOutsideWorkingDirectories` 读块在场时，shell 解析器无法静态分析的命令（内联代码即典型）问人。该类阻塞属**沙箱读限制分析闸**，非权限规则层。
 
-### 残余阻塞类清单（bypass 下仍弹，官方口径）
+### 残余阻塞类清单
+
+> bypass 下仍弹，官方口径逐条标源。
 
 1. **读沙箱读块**：`blockReadsOutsideWorkingDirectories` 在场时，出工作目录读与未沙箱化重试「即使在 auto 与 bypassPermissions 模式下也会提示」（需 2.1.257+；2.1.271 修 `cd` 加 git 链与子 shell 漏拦 bug）[实证： 官方 permission-modes「Actions no mode auto-approves」节加标本]。
 2. **显式 ask 规则**：bypass 下仍提示（最常见的惊讶源）；deny 规则全模式拦截；项目层 ask/deny 按优先级栈盖过用户层 bypass [实证： 同上]。
