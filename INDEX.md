@@ -127,6 +127,7 @@
 - `2026-09-12-D30更名收尾批.md`
 - `2026-09-13-D31D35协调批与1.0.0发版.md`
 - `2026-09-14-herdr共存实证与D47gnu交叉切换.md`
+- `2026-09-15-bypass残余阻塞分类学研究.md`
 
 ## 五、研究文档
 
@@ -162,7 +163,7 @@
 | S026 | `S026-grok与kimi的OAuth登录流.md` | 两家设备码流取证、凭据落盘与登录态纯文件检测 |
 | S027 | `S027-提供商别名注入矩阵.md` | zhipu/deepseek x claude/codex 四格官方端点与注入形态；sops 托管密钥 |
 | S028 | `S028-oma自更新机制.md` | releases/latest 查询、资产约定、Windows rename 舞步自替换、封版前 --git 主路径 |
-| S029 | `S029-bypassPermissions会话层失效与命令面注入.md` | 模式取值顺序与 2.1.257 项目层忽略；oma 命令面 argv 注入与 respawn 口径 |
+| S029 | `S029-bypassPermissions会话层失效与命令面注入.md` | 模式取值顺序与 2.1.257 项目层忽略；oma 命令面 argv 注入与 respawn 口径；2026-09-15 追记 bypass 后残余阻塞分类学（读沙箱读块、ask 规则、灾难删除网、folder trust、MCP 双键、resume 不还原证伪旧记）与 hst doctor 候选面 |
 | S030 | `S030-密钥hook安全拦截接管与同类Rust实现.md` | ohmypwsh secret-guard 语义、kingfisher/rtk 取证、oma 零依赖接管落点 |
 | S031 | `S031-密钥一钥两密文存储与四shell懒注入接管.md` | ohmycloud D20 keystore 与 ohmypwsh 懒注入取证；oma secrets 子树设计 |
 | S032 | `S032-GitHub发版与分支合并标准流程调研.md` | 三分支模型、合并三式、分支保护与发版自动化选型；本仓适用结论 |

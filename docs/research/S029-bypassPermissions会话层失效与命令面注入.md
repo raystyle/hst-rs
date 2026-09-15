@@ -29,3 +29,45 @@
 
 - 新机器首启仍会弹一次 dangerous-mode 接受框（user 层 skipPrompt 需首启后才有）：settle 白名单可覆盖。
 - codex/grok/kimi 的 yolo 走各自配置面（S007），不进 argv。
+
+## 追记：bypass 后残余阻塞分类学
+
+> 2026-09-15。用户问：yolo 设 bypassPermissions 后为何仍不停阻塞交互；附实弹标本（browse-rs 会话）。方法：claude-code-guide 代理对官方文档（permission-modes、permissions、settings、settings-reference、mcp、sessions、sandboxing）与 CHANGELOG 全量扫描取证。
+
+### 实弹标本
+
+- [实证： browse-rs 会话截屏] 内联 `python -c` 被「Do you want to proceed?」拦截，文案点名机制：`permissions.blockReadsOutsideWorkingDirectories` 读块在场时，shell 解析器无法静态分析的命令（内联代码即典型）问人。该类阻塞属**沙箱读限制分析闸**，非权限规则层。
+
+### 残余阻塞类清单（bypass 下仍弹，官方口径）
+
+1. **读沙箱读块**：`blockReadsOutsideWorkingDirectories` 在场时，出工作目录读与未沙箱化重试「即使在 auto 与 bypassPermissions 模式下也会提示」（需 2.1.257+；2.1.271 修 `cd` 加 git 链与子 shell 漏拦 bug）[实证： 官方 permission-modes「Actions no mode auto-approves」节加标本]。
+2. **显式 ask 规则**：bypass 下仍提示（最常见的惊讶源）；deny 规则全模式拦截；项目层 ask/deny 按优先级栈盖过用户层 bypass [实证： 同上]。
+3. **灾难删除安全网**：关键路径 `rm` / `rmdir`（文件系统根、根下顶层、家目录、当前与父目录、`"$VAR"/*` 形含 `$()` 与反引号内）bypass 下也须批准，任何 allow 规则与 hook 都不能代批（2.1.126 立、2.1.208 扩形）[实证： 同上加 changelog]。
+4. **folder trust 对话框**：完全不受权限模式管（信任键 `~/.claude.json` 的 `projects.<path>.hasTrustDialogAccepted`，按 git 仓库根键控）；未信任时项目 allow 规则与 `additionalDirectories` 被扣、`.mcp.json` 审批挂起（2.1.196 起克隆仓不能自批自己的服务器）；`/cd` 到未信任目录重弹 [实证: 官方 permissions「workspace trust」节]。
+5. **MCP 面**：`.mcp.json` 审批框要 bypass 加 `skipDangerousModePermissionPrompt` **双在场**才跳（文档明示 bypass 单独不够）；connector 组织 ask 控制 bypass 仍弹且无记住项；MCP `requiresUserInteraction` 工具每模式都弹 [实证： 官方 mcp 文档]。
+6. **resume 不还原模式**：存了 bypass 的会话 resume 后回手动模式，须传 `--permission-mode` 或 `--dangerously-skip-permissions`；会话选择器与 `/resume` 同样不还原 [实证： 官方 sessions「Permission mode on resume」节]。**本文件前文「`--resume` 沿用保存时的模式」系旧记，据此证伪更正**。
+7. **跨会话消息与托管设置安全框**：入站跨会话消息保留与 `isolatePeerMachines` 批准（2.1.224）、托管/服务器托管 settings 的 hook 与 shell 命令等安全批准框（2.1.232 加 2.1.260 加 2.1.269），独立于权限模式 [实证： changelog]。
+8. **hook 不被 bypass 跳过**：PreToolUse hook 每模式照跑（收 `permission_mode` 可分支）；其 ask 决策在 bypass 下是否强制交互未见于文档 [记忆： 待复核]。
+
+### 项目层覆盖与静默降级
+
+- 优先级栈项目层高于用户层：项目 `defaultMode:"auto"` 会静默盖掉用户层 bypass，全线提示回潮（auto 模式自身有首读外目录、重复阻塞回退等专属提示类）[实证： settings 优先级图]。
+- 2.1.257 起项目层与 local 层 `bypassPermissions` 与 `auto` 被忽略（本文件前文已记，官方 changelog 原文确认）。
+- IDE 面：VS Code 不读项目层启动模式且需扩展开关放行 bypass 否则以手动模式起；Desktop 每文件夹记模式可盖配置 [实证： permission-modes「Switch permission modes」三分页]。
+
+### flag 对 defaultMode 的差集
+
+`--dangerously-skip-permissions` 与用户层 `defaultMode` 等效选模式，另加：启动参数免疫 2.1.257 项目层忽略、resume 时覆盖还原、`-p` 下残余提示类**转拒绝而非问**、`claude agents` 下显式免责（2.1.196）、2.1.121 加 2.1.126 起覆盖受保护路径写（`.claude` / `.git` / `.vscode` / shell 配置，灾难删除网除外）[实证： permission-modes 加 changelog]。
+
+### changelog 扫描结论
+
+2.1.2xx 无未结的「bypass 仍提示」回归条目；相关集 = 2.1.271、2.1.257、2.1.248（`--restricted` 拒 bypass）、2.1.223（代理 bypass 须守组织禁用）、2.1.208、2.1.196；早期 = 2.1.157 加 2.1.97（沙箱网络提示自 2.1.97 起 bypass/auto 自动批）、2.1.110、2.0.71 [实证： anthropics/claude-code CHANGELOG main]。
+
+### hst 落点评估与待办
+
+- hst yolo full 三键（bypass 用户层加 skipDangerousModePermissionPrompt 加 enableAllProjectMcpServers）已盖：一次性 dangerous 框、MCP 审批框（双在场条件）、`.mcp.json` 全批；用户层 bypass 不受 2.1.257 项目层忽略影响 [实证： yolo.rs 写入面对照本清单]。
+- 残余**不可消除类**（设计如此）：灾难删除安全网、connector 组织 ask、requiresUserInteraction、folder trust（doctor 已有 trust.project 检查面覆盖）。
+- 残余**可诊断类**（doctor yolo 面候选，候选 D50）：项目层 `ask` 规则或 `defaultMode` 在场（静默盖用户层）、`blockReadsOutsideWorkingDirectories` 在场（读块分析闸）、resume 后模式回退（操作面提示：重开带 flag）。待用户裁立项。
+- S029 本体修正一处：见上第 6 条（resume 旧记证伪）。
+
+主要来源：code.claude.com/docs/en/ 的 permission-modes、permissions、settings、settings-reference、mcp、sessions、sandboxing 七页加 anthropics/claude-code CHANGELOG。
