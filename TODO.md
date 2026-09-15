@@ -8,8 +8,8 @@ D51 状态栏第一行 clock 段（2026-09-15 立项，第 2 轮裁分钟精度�
 
 - [x] clock 段（SEG_CLOCK：Get-Date `yyyy-MM-dd HH:mm` 零子进程；模板 `{icon}{datetime}` 加 clock 图标键；缺省第一行行尾）
 - [x] 测试与 dogfood（默认序含 clock 断言、Get-Date 格式断言；181 单测加 28 集成绿；本机实弹 `󰥔 2026-09-15 13:22`）
-- [ ] 文档（R002 状态栏行、INDEX 已落）加 codex 评审对齐后推 main
-- [ ] 随 v1.2.0 封版（版本加 lock 加 CHANGELOG，tag 后四件回执）
+- [x] 文档（R002 状态栏行加占位符清单、INDEX、PRD 措辞）加 codex 评审 F1 至 F3 全收推 main（c563ffa 加 7823698）
+- [x] 随 v1.2.0 封版（09495e9 tag，run 34933356902 六岗绿，六资产 digest 三方对账全等，镜像 hst/stable curl 200 全复验，herdr 知会 ohmycloud pin 素材已发）
 
 D50 doctor yolo 诊断面补 bypass 残余阻塞信号（2026-09-15 立项，S029 追记候选转正）：
 
