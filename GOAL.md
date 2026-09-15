@@ -7,8 +7,10 @@
 
 > 当前目标的起点：何时发起、为什么发起、要解决什么问题。
 
-- **日期**：2026-09-14。
-- **起点**：D48 交付收官后，用户问「为什么不是 hst skill」引出旧牌翻案，裁「走」立项 D49：技能名翻 hst（D14/D22/D45 保留旧牌裁定翻案），用户级 `hst skill --write` 与项目级 init 部署（.agents/.claude/.grok/.kimi-code 四处 skills/）同翻；旧牌 ohmyagents 同体双写兼容窗至 1.2.0（description 首带 CTA），窗口过后摘双写加清扫（沿 D29 至 D45 模式）。
+- **日期**：2026-09-15。
+- **起点**：S029 追记（bypass 残余阻塞分类学）hst 落点评估节候选转正，用户令「开工」立项 D50：doctor yolo 诊断面补三项可诊断信号（项目层 defaultMode 非 bypass 遮蔽、项目层 ask 规则、读块键）；随批修既有 yolo 检查两缺口（漏 settings.local.json 层、项目层 bypass-only 假阳性，2.1.257 起项目层 bypass 被忽略）。
+
+D49 前起点（2026-09-14，D48 交付收官后，用户问「为什么不是 hst skill」引出旧牌翻案，裁「走」立项 D49：技能名翻 hst（D14/D22/D45 保留旧牌裁定翻案），用户级 `hst skill --write` 与项目级 init 部署（.agents/.claude/.grok/.kimi-code 四处 skills/）同翻；旧牌 ohmyagents 同体双写兼容窗至 1.2.0（description 首带 CTA），窗口过后摘双写加清扫（沿 D29 至 D45 模式）。
 
 D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）：舰队滚 1.1.5 撞 api.github.com 匿名 403 时 `hst self update` 无镜像回退断源；补 stable 镜像腿（边车 digest 判新复用 dev 机制）、缺省 GitHub 优先加失败自动回退镜像腿、GH_TOKEN Bearer 附加、ark 三层读序参照（段随通道、dev 禁回落 stable）。
 
@@ -16,7 +18,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：无（D49 两轮交付闭环：第 1 轮翻名加兼容窗、第 2 轮用户令旧牌直接删除加幂等退役，均评审对齐推 main CI 绿）。
+- **锚定的目标**：D50 doctor yolo 诊断面补 bypass 残余阻塞信号：三项新 warn 检查（yolo.mask 项目层遮蔽含 local 层、yolo.ask 项目层 ask 规则、yolo.readblock 读沙箱键）加 yolo 检查语义随 S029 修正（项目层 bypass-only 不再 ok）；测试门禁全绿、codex 评审对齐后推 main。
 
 ### 推进时间线
 
@@ -24,6 +26,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-15 | **D50 立项开工**：S029 追记候选转正（用户令「开工」）：doctor yolo 面补三项 warn（项目层遮蔽、ask 规则、读块键）加既有检查两缺口随批修（local 层读取、项目层 bypass-only 假阳性）；评审闸门用户令随批（w2:p2） |
 | 2026-09-14 | **D49 第 2 轮交付（旧牌直接删除）**：用户令取消兼容窗；单名 hst 加幂等退役（用户级生成签名识别打 skill.retired、项目级四处 marker 家族打 (retired)，外科式只删 SKILL.md 目录空才收）；codex F1 至 F4 全收后推 main（ed70707 加 3b97b28）CI 绿；dogfood 退役实弹；舰队回执四端落位加 lan-mac 504 反例素材，修订知会已发 |
 | 2026-09-14 | **D49 交付**：codex F1 至 F3 全收后推 main（1ad0685 加 74b8e1c）CI 绿；用户级与项目级双技能落位实弹、本会话技能列表双技能刷新可见；1.2.0 摘兼容双写入 TODO 队列 |
 | 2026-09-14 | **D49 立项开工**：用户问「为什么不是 hst skill」（答 D14/D22/D45 保留旧牌裁定链）后裁「走」翻案；skillgen 双名渲染加 cmd_skill 用户级双写加 deploy_skills 四处双写加仓自有 .agents/skills 迁移；177 单测加 28 集成绿、dogfood 用户级与项目级双技能落位 |

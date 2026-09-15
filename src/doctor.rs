@@ -853,8 +853,12 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
 
     // D28 第 3 轮：yolo 两级显式（--yolo 用户级、--project-yolo 项目级），
     // doctor 双级接受；项目键在场时按 agent 分层规则遮蔽用户键（报告项目
-    // 面为准）。
+    // 面为准）。D50：项目层补 settings.local.json 读取（local 优先于
+    // shared，对齐 settings 优先级栈，S029 原案 Allow 堆积即在 local 层）；
+    // 项目层 bypass-only 不再判 ok（claude 2.1.257 起项目与 local 层
+    // bypassPermissions 被忽略，运行时回退用户层，S029 追记）。
     let claude_shared = root.join(".claude").join("settings.json");
+    let claude_local_settings = root.join(".claude").join("settings.local.json");
     let claude_user_yolo = home.join(".claude").join("settings.json");
     let claude_mode_at = |p: &Path| -> Option<String> {
         json_file(p)
@@ -864,29 +868,63 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
             .and_then(|m| m.as_str())
             .map(str::to_string)
     };
-    let claude_proj_mode = claude_mode_at(&claude_shared);
+    let claude_proj_mode = claude_mode_at(&claude_local_settings)
+        .map(|m| (m, claude_local_settings.clone()))
+        .or_else(|| claude_mode_at(&claude_shared).map(|m| (m, claude_shared.clone())));
     let claude_user_mode = claude_mode_at(&claude_user_yolo);
     // D33：yolo 判据分级接受（full=bypassPermissions、partial=acceptEdits）。
     let claude_yolo_ok = |m: &str| matches!(m, "bypassPermissions" | "acceptEdits");
     match (&claude_proj_mode, &claude_user_mode) {
-        // 双级冲突（D28 第 4 令）：项目遮蔽用户，warn 加对齐 CTA。
-        (Some(p), Some(u)) if p != u => push_status(
+        // 双级冲突（D28 第 4 令；D50 补 local 层）：项目遮蔽用户即静默降级
+        //（S029 追记：项目层 defaultMode 优先级高于用户层，bypass 名义下
+        // 全线提示回潮），warn 加对齐 CTA。
+        (Some((p, ppath)), Some(u)) if p != u => push_status(
             &mut findings,
             "claude",
             "yolo",
             Status::Warn,
-            &claude_shared,
+            ppath,
             format!(
-                "conflict: project defaultMode={p} shadows user {u}; align via \
-                 `hst init --project-yolo=<level>` or drop one level (D28 r4)"
+                "conflict: project defaultMode={p} shadows user {u} (silent \
+                 downgrade, S029); align via `hst init --project-yolo=<level>` \
+                 or drop one level (D28 r4)"
             ),
         ),
-        (Some(p), Some(_)) | (Some(p), None) => push(
+        // 项目层与用户层同为 bypass：2.1.257 起项目层被忽略，实际生效层是
+        // 用户层（同为 bypass 即仍 ok，报告用户层面）。
+        (Some((p, _)), Some(u)) if p == "bypassPermissions" && u == "bypassPermissions" => push(
+            &mut findings,
+            "claude",
+            "yolo",
+            true,
+            &claude_user_yolo,
+            "defaultMode=bypassPermissions (user level; project copy ignored since claude 2.1.257)",
+        ),
+        (Some((p, ppath)), Some(_)) => push(
             &mut findings,
             "claude",
             "yolo",
             claude_yolo_ok(p),
-            &claude_shared,
+            ppath,
+            format!("defaultMode={p} (project level)"),
+        ),
+        // 项目层 bypass-only：2.1.257 起被忽略，运行时无 bypass（D50 修
+        // 假阳性：此前判 ok）。
+        (Some((p, ppath)), None) if p == "bypassPermissions" => push_status(
+            &mut findings,
+            "claude",
+            "yolo",
+            Status::Warn,
+            ppath,
+            "project-only defaultMode=bypassPermissions is ignored since claude \
+             2.1.257 (session starts manual); set user level via `hst init --yolo`",
+        ),
+        (Some((p, ppath)), None) => push(
+            &mut findings,
+            "claude",
+            "yolo",
+            claude_yolo_ok(p),
+            ppath,
             format!("defaultMode={p} (project level)"),
         ),
         (None, Some(u)) => push(
@@ -905,6 +943,61 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
             &claude_user_yolo,
             "missing permissions.defaultMode=bypassPermissions|acceptEdits (tool prompt will block)",
         ),
+    }
+
+    // D50：项目层显式 ask 规则（S029 追记第 2 类）——bypass 只跳 allow 层，
+    // ask 照弹；项目层按优先级栈盖用户层。warn 级不 block（部署缺口）。
+    let ask_count = |p: &Path| -> usize {
+        json_file(p)
+            .as_ref()
+            .and_then(|v| v.get("permissions"))
+            .and_then(|pp| pp.get("ask"))
+            .and_then(|a| a.as_array())
+            .map_or(0, |a: &Vec<Json>| a.len())
+    };
+    for (path, layer) in [
+        (&claude_local_settings, "project-local"),
+        (&claude_shared, "project"),
+    ] {
+        let n = ask_count(path);
+        if n > 0 {
+            push_status(
+                &mut findings,
+                "claude",
+                "yolo.ask",
+                Status::Warn,
+                path,
+                format!(
+                    "permissions.ask has {n} rule(s) in {layer} layer; ask rules \
+                     still prompt even in bypassPermissions (S029); remove or narrow"
+                ),
+            );
+        }
+    }
+    // D50：读沙箱读块（S029 追记标本类）——blockReadsOutsideWorkingDirectories
+    // 在场时，shell 解析器无法静态分析的命令（内联 python -c 等）即使
+    // bypass 也问人。任一层为 true 即 warn。
+    let read_block = |p: &Path| -> bool {
+        json_file(p)
+            .as_ref()
+            .and_then(|v| v.get("permissions"))
+            .and_then(|pp| pp.get("blockReadsOutsideWorkingDirectories"))
+            .and_then(|b| b.as_bool())
+            .unwrap_or(false)
+    };
+    for path in [&claude_local_settings, &claude_shared, &claude_user_yolo] {
+        if read_block(path) {
+            push_status(
+                &mut findings,
+                "claude",
+                "yolo.readblock",
+                Status::Warn,
+                path,
+                "permissions.blockReadsOutsideWorkingDirectories=true: shell \
+                 commands the parser cannot analyze still prompt even in \
+                 bypassPermissions (S029)",
+            );
+        }
     }
 
     let claude_local = root.join(".claude").join("settings.local.json");
@@ -2261,6 +2354,136 @@ mod tests {
         let _ = fs::remove_dir_all(&user);
         let _ = fs::remove_dir_all(&oma);
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn project_local_layer_shadows_user_bypass() {
+        // D50：项目 settings.local.json 层优先于 settings.json 与用户层
+        //（settings 优先级栈，S029 原案 Allow 堆积即在 local 层）——local
+        // 层 defaultMode=default 遮蔽用户层 bypass，yolo 检查须 warn。
+        let _g = crate::pathutil::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let user = temp_root("mask-user");
+        let root = temp_root("mask-proj");
+        fs::create_dir_all(user.join(".claude")).unwrap();
+        fs::create_dir_all(root.join(".claude")).unwrap();
+        crate::yolo::apply_user_yolo_with(&user).unwrap();
+        // 项目 shared 层同 bypass（旧判 ok 的形态），local 层才是遮蔽源。
+        fs::write(
+            root.join(".claude").join("settings.json"),
+            r#"{"permissions": {"defaultMode": "bypassPermissions"}}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join(".claude").join("settings.local.json"),
+            r#"{"permissions": {"defaultMode": "default"}}"#,
+        )
+        .unwrap();
+        std::env::set_var("HST_USER_HOME", &user);
+        let d = diagnose(&root).expect("diagnose");
+        std::env::remove_var("HST_USER_HOME");
+        let f = d
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo")
+            .expect("yolo row");
+        assert_eq!(f.status, Status::Warn, "{:?}", f.detail);
+        assert!(f.detail.contains("shadows user"), "{:?}", f.detail);
+        assert!(
+            f.path.ends_with("settings.local.json"),
+            "mask source must be the local layer: {}",
+            f.path
+        );
+        let _ = fs::remove_dir_all(&user);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn project_only_bypass_warns_ignored_since_257() {
+        // D50 假阳性修正：项目层 bypass-only（用户层无 yolo）此前判 ok；
+        // claude 2.1.257 起项目层 bypassPermissions 被忽略，运行时手动模式，
+        // 须 warn 带 CTA。项目 + 用户层同为 bypass 仍 ok（回退用户层生效）。
+        let _g = crate::pathutil::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let user = temp_root("pbo-user");
+        let root = temp_root("pbo-proj");
+        let both = temp_root("pbo-both");
+        fs::create_dir_all(user.join(".claude")).unwrap();
+        fs::create_dir_all(root.join(".claude")).unwrap();
+        fs::create_dir_all(both.join(".claude")).unwrap();
+        let bypass_proj = r#"{"permissions": {"defaultMode": "bypassPermissions"}}"#;
+        fs::write(root.join(".claude").join("settings.json"), bypass_proj).unwrap();
+        fs::write(both.join(".claude").join("settings.json"), bypass_proj).unwrap();
+        std::env::set_var("HST_USER_HOME", &user);
+        let d = diagnose(&root).expect("diagnose");
+        let f = d
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo")
+            .expect("yolo row");
+        std::env::remove_var("HST_USER_HOME");
+        assert_eq!(f.status, Status::Warn, "{:?}", f.detail);
+        assert!(
+            f.detail.contains("ignored since claude 2.1.257"),
+            "{:?}",
+            f.detail
+        );
+        let _ = fs::remove_dir_all(&user);
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&both);
+    }
+
+    #[test]
+    fn ask_rules_and_read_block_warn_as_residual_blockers() {
+        // D50（S029 追记第 1、2 类）：项目层 permissions.ask 非空与
+        // blockReadsOutsideWorkingDirectories=true 都是 bypass 名义下的
+        // 残余阻塞源，各打 warn；干净配置不出现两检查行。
+        let _g = crate::pathutil::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let user = temp_root("res-user");
+        let root = temp_root("res-proj");
+        let clean = temp_root("res-clean");
+        fs::create_dir_all(user.join(".claude")).unwrap();
+        fs::create_dir_all(root.join(".claude")).unwrap();
+        fs::create_dir_all(clean.join(".claude")).unwrap();
+        crate::yolo::apply_user_yolo_with(&user).unwrap();
+        fs::write(
+            root.join(".claude").join("settings.json"),
+            r#"{"permissions": {
+                "ask": ["Bash(rm:*)"],
+                "blockReadsOutsideWorkingDirectories": true
+            }}"#,
+        )
+        .unwrap();
+        std::env::set_var("HST_USER_HOME", &user);
+        let d = diagnose(&root).expect("diagnose");
+        let c = diagnose(&clean).expect("diagnose clean");
+        std::env::remove_var("HST_USER_HOME");
+        let ask = d
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo.ask")
+            .expect("yolo.ask row");
+        assert_eq!(ask.status, Status::Warn, "{:?}", ask.detail);
+        assert!(ask.detail.contains("1 rule"), "{:?}", ask.detail);
+        let rb = d
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo.readblock")
+            .expect("yolo.readblock row");
+        assert_eq!(rb.status, Status::Warn, "{:?}", rb.detail);
+        assert!(
+            !c.findings
+                .iter()
+                .any(|f| f.check == "yolo.ask" || f.check == "yolo.readblock"),
+            "clean project must not carry the residual-blocker checks"
+        );
+        let _ = fs::remove_dir_all(&user);
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&clean);
     }
 
     #[test]

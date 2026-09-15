@@ -69,7 +69,7 @@
 
 - hst yolo full 三键（bypass 用户层加 skipDangerousModePermissionPrompt 加 enableAllProjectMcpServers）已盖：一次性 dangerous 框、MCP 审批框（双在场条件）、`.mcp.json` 全批；用户层 bypass 不受 2.1.257 项目层忽略影响 [实证： yolo.rs 写入面对照本清单]。
 - 残余**不可消除类**（设计如此）：灾难删除安全网、connector 组织 ask、requiresUserInteraction、folder trust（doctor 已有 trust.project 检查面覆盖）。
-- 残余**可诊断类**（doctor yolo 面候选，候选 D50）：项目层 `ask` 规则或 `defaultMode` 在场（静默盖用户层）、`blockReadsOutsideWorkingDirectories` 在场（读块分析闸）、resume 后模式回退（操作面提示：重开带 flag）。待用户裁立项。
+- 残余**可诊断类**（doctor yolo 面候选，候选 D50）：项目层 `ask` 规则或 `defaultMode` 在场（静默盖用户层）、`blockReadsOutsideWorkingDirectories` 在场（读块分析闸）、resume 后模式回退（操作面提示：重开带 flag）。**已立项 D50 并交付（2026-09-15）**：yolo 检查补 local 层读取加项目层 bypass-only 假阳性修正（2.1.257 忽略语义），新检查 `yolo.ask` 与 `yolo.readblock`；resume 回退属操作面知识不进检查面（留本档）。
 - S029 本体修正一处：见上第 6 条（resume 旧记证伪）。
 
 主要来源：code.claude.com/docs/en/ 的 permission-modes、permissions、settings、settings-reference、mcp、sessions、sandboxing 七页加 anthropics/claude-code CHANGELOG。

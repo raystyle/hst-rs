@@ -3,10 +3,10 @@
 > 角色：**当前目标方案文档**：基于 `docs\research\`（为什么）与 `docs\references\`（怎么做）撰写的执行计划；每条挂依据来源，随目标变化更新，不存历史目标。
 > 分工：`PRD.md` = 要什么；`TODO.md` = 做到哪；本文件 = 怎么做；通用工作流见 `docs\guide\G003-工作流标准细则-从登记到归档五步.md`。
 
-## 当前目标：D49 技能名翻 hst 加旧名兼容窗
+## 当前目标：D50 doctor yolo 诊断面补 bypass 残余阻塞信号
 
-> 用户裁 2026-09-14「走」立项（第 1 轮带兼容窗），同日第 2 轮令「老的 ohmyagents 应该删除啊」取消兼容窗：旧牌直接删除加幂等退役。依据：PRD D49 第 2 轮；ours 识别沿 write_skill marker 家族。三段：
+> 用户裁 2026-09-15「开工」（S029 追记候选转正）。依据：S029 追记残余阻塞分类学（官方七页文档加 changelog 取证）；R002 doctor 行。三段：
 
-1. **skillgen 单名渲染（src\skillgen.rs）**：`render_skill` 唯一名 hst（第 2 轮删 legacy 渲染与常量）。
-2. **单写加退役（src\main.rs 加 src\deploy.rs）**：用户级 `hst skill --write` 只写 `~/.claude/skills/hst/`，旧牌目录幂等退役（生成签名识别，打 `skill.retired=`）；项目级 `deploy_skills` 四处（.agents/.claude/.grok/.kimi-code）各写 `skills/hst/`，旧牌 ours 目录（marker 家族识别）退役打 `(retired)`，用户手改或他源不动；仓自有 `.agents/skills/ohmyagents` 跟踪件删除。
-3. **测试与文档**：skillgen 断言唯一名；deploy 集成断言四处 hst 在位加旧牌 ours 目录退役加用户手改保留；门禁全绿加 dogfood（退役实弹）；文档四处同步（AGENTS 意图路由行、R002 skill 行、INDEX 三行、main.rs 命令注释）随第 2 轮口径重写；codex 评审对齐后推 main（封版时点另裁）。
+1. **既有 yolo 检查语义修正（src\doctor.rs）**：项目层读取补 `settings.local.json`（local 优先于 shared，对齐 settings 优先级栈）；项目层 bypass-only（用户层无 bypass）不再判 ok（2.1.257 起项目与 local 层 bypass 被忽略，运行时回退用户层即无 bypass，S029 已档），warn 带 CTA；项目层 bypass 加用户层 bypass 并存保持 ok（detail 注回退到用户层）。
+2. **三项新 warn 检查（claude 域）**：`yolo.mask` = 项目层（local 或 shared）defaultMode 非 bypass 且用户层 bypass 在场（静默遮蔽，detail 标层源）；`yolo.ask` = 项目层 permissions.ask 非空（bypass 只跳 allow 层，ask 照弹，S029 第 2 类）；`yolo.readblock` = 任一层 blockReadsOutsideWorkingDirectories 为 true（读沙箱分析闸，不可静态分析命令即使 bypass 也问人，S029 标本类）。全部 warn 级不 block（部署缺口不计数），detail 带 CTA。
+3. **测试与文档**：doctor 单测补三类正负例（mask 双层源、ask 非空、readblock 任一层、项目层 bypass-only 假阳性修正回归）；R002 doctor 行加三检查名与判据、S029 追记挂 D50 落地回指、INDEX doctor.rs 行加 D50；门禁全绿、dogfood 本机实弹、codex 评审对齐（w2:p2，用户令）后推 main（封版时点另裁）。
