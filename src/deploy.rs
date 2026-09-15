@@ -1564,7 +1564,7 @@ pub fn deploy_all_with(
     // 刚落的 yolo 键当项目键整批摘掉（宿主裸 init 于 C:\Users\ray 实弹：
     // settings.json 与 codex 与 kimi 三文件同批 (retired-yolo) 洗键）。
     // 家目录不是项目：退役趟整组跳过并打点。
-    if same_location(&root, user_home) {
+    if crate::pathutil::same_location(&root, user_home) {
         report.warns.push(
             "project-level retirement skipped: project root is the user home \
              (home is not a project; user-level keys stay)"
@@ -1580,15 +1580,6 @@ pub fn deploy_all_with(
     deploy_kimi_project(&root, &mut report)?;
     deploy_instructions(&root, &mut report)?;
     Ok(report)
-}
-
-/// 两路径是否同一位置：canonicalize 双侧（符号链接归一，macOS /var 与
-/// /private/var 类），失败退 abs 字符串等值。
-fn same_location(a: &Path, b: &Path) -> bool {
-    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
-        (Ok(ca), Ok(cb)) => ca == cb,
-        _ => crate::pathutil::abs_display(a) == crate::pathutil::abs_display(b),
-    }
 }
 
 #[cfg(test)]

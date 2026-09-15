@@ -629,20 +629,32 @@ fn cmd_init(
     if let Some(level) = project_yolo {
         println!("init.flag.project_yolo=true");
         println!("init.yolo.level={}", level.as_str());
-        match level {
-            yolo::YoloLevel::Off => {
-                for p in yolo::retire_project_yolo(&root)? {
-                    println!("init.retired={p}");
+        // D52 铁证修复（codex F1）：家目录不是项目——--project-yolo 于家
+        // 目录会把用户级文件当项目层写摘（与裸 init 同型，宿主实弹类），
+        // 整支跳过并打点。
+        let home = hst::pathutil::user_home()?;
+        if hst::pathutil::same_location(&root, &home) {
+            println!(
+                "init.warn=project-yolo skipped: root is the user home \
+                 (home is not a project; user-level keys stay)"
+            );
+            println!("init.hooks=skipped");
+        } else {
+            match level {
+                yolo::YoloLevel::Off => {
+                    for p in yolo::retire_project_yolo(&root)? {
+                        println!("init.retired={p}");
+                    }
+                }
+                _ => {
+                    let report = yolo::apply_project_yolo_level(&root, level)?;
+                    for p in &report.wrote {
+                        println!("init.wrote={p}");
+                    }
                 }
             }
-            _ => {
-                let report = yolo::apply_project_yolo_level(&root, level)?;
-                for p in &report.wrote {
-                    println!("init.wrote={p}");
-                }
-            }
+            println!("init.hooks=skipped");
         }
-        println!("init.hooks=skipped");
     } else {
         // 裸 init（无旗标）= 全套部署，用户级 yolo 固定 full 级；
         // --yolo[=<级>] = 仅键模式，级别缺省 full（clap default_missing_value）。

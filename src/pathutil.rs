@@ -308,3 +308,13 @@ mod tests {
         }
     }
 }
+
+/// D52 铁证修复共享件：两路径是否同一位置（canonicalize 双侧归一符号
+/// 链接，macOS /var 类；失败退 abs 字符串等值）。deploy_all 家目录守卫与
+/// cmd_init 的 --project-yolo 守卫共用。
+pub fn same_location(a: &Path, b: &Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        _ => abs_display(a) == abs_display(b),
+    }
+}
