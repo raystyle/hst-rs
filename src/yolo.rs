@@ -310,6 +310,13 @@ pub fn apply_project_yolo_level(root: &Path, level: YoloLevel) -> Result<ApplyRe
             .as_object_mut()
             .unwrap()
             .insert("defaultMode".into(), json!(keys.claude_mode));
+        // D52（codex F2）：项目 full 对称落读块关（与用户级同一承诺）。
+        if level == YoloLevel::Full {
+            permissions.as_object_mut().unwrap().insert(
+                "blockReadsOutsideWorkingDirectories".into(),
+                Json::Bool(false),
+            );
+        }
     }
     write_json(&claude_shared, &shared)?;
     wrote.push(claude_shared.display().to_string());
@@ -404,7 +411,8 @@ pub fn retire_project_yolo(root: &Path) -> Result<Vec<String>, String> {
     let root = abs_display(root);
     let mut changed = Vec::new();
 
-    // claude 项目 settings.json：permissions.defaultMode 是 ours 落值才摘。
+    // claude 项目 settings.json：permissions.defaultMode 是 ours 落值才摘；
+    // D52（codex F2）：ours 落的 blockReads=false 对称等值摘。
     let claude_shared = root.join(".claude").join("settings.json");
     if claude_shared.exists() {
         let mut v = read_json(&claude_shared)?;
@@ -417,6 +425,19 @@ pub fn retire_project_yolo(root: &Path) -> Result<Vec<String>, String> {
             {
                 if let Some(p) = v.get_mut("permissions").and_then(|p| p.as_object_mut()) {
                     p.remove("defaultMode");
+                    dirty = true;
+                    if p.is_empty() {
+                        v.as_object_mut().unwrap().remove("permissions");
+                    }
+                }
+            }
+            if v.get("permissions")
+                .and_then(|p| p.get("blockReadsOutsideWorkingDirectories"))
+                .and_then(|x| x.as_bool())
+                == Some(false)
+            {
+                if let Some(p) = v.get_mut("permissions").and_then(|p| p.as_object_mut()) {
+                    p.remove("blockReadsOutsideWorkingDirectories");
                     dirty = true;
                     if p.is_empty() {
                         v.as_object_mut().unwrap().remove("permissions");
@@ -900,7 +921,33 @@ mod tests {
             "off removes ours-written readblock false"
         );
         assert_eq!(v2["env"]["FOO"], "bar", "retire keeps foreign keys");
+        // D52（codex F2）：项目 full 对称落读块关、项目 off 等值摘。
+        let proj = fresh_dir();
+        std::fs::create_dir_all(proj.join(".claude")).unwrap();
+        apply_project_yolo_level(&proj, YoloLevel::Full).unwrap();
+        let pv: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(proj.join(".claude").join("settings.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            pv["permissions"]["blockReadsOutsideWorkingDirectories"], false,
+            "project full writes readblock false"
+        );
+        retire_project_yolo(&proj).unwrap();
+        let p2 = proj.join(".claude").join("settings.json");
+        if p2.exists() {
+            let pv2: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&p2).unwrap()).unwrap();
+            assert!(
+                pv2["permissions"]
+                    .get("blockReadsOutsideWorkingDirectories")
+                    .is_none(),
+                "project off removes ours-written readblock false"
+            );
+        }
+        // 文件不在 = 整文件只剩 ours 键被删（retire 既有语义），同样通过。
         let _ = std::fs::remove_dir_all(&home);
+        let _ = std::fs::remove_dir_all(&proj);
     }
 
     fn fresh_dir() -> std::path::PathBuf {

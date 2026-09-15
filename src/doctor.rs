@@ -74,8 +74,12 @@ enum JsonFileState {
 }
 
 fn json_file_state(path: &Path) -> JsonFileState {
-    let Ok(text) = fs::read_to_string(path) else {
-        return JsonFileState::Absent;
+    let text = match fs::read_to_string(path) {
+        Ok(t) => t,
+        // codex F3：只有真不在算 Absent；读得出错（如 UTF-16 非 UTF-8）
+        // 属 Bad——正是本批要消的「换了编码又假报 missing」形态。
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return JsonFileState::Absent,
+        Err(_) => return JsonFileState::Bad,
     };
     match serde_json::from_str(text.trim_start_matches('\u{feff}')) {
         Ok(v) => JsonFileState::Ok(v),
@@ -978,6 +982,20 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
             &claude_user_yolo,
             format!("defaultMode={u} (user level)"),
         ),
+        // codex F4：用户级文件在但解析失败时，yolo 行不再假报 missing 加
+        // block（误导且误计 exit 1）；点名 unparseable 并指向 yolo.parse 行。
+        (None, None)
+            if matches!(json_file_state(&claude_user_yolo), JsonFileState::Bad) =>
+        {
+            push_status(
+                &mut findings,
+                "claude",
+                "yolo",
+                Status::Warn,
+                &claude_user_yolo,
+                "user settings unparseable; cannot read defaultMode (see yolo.parse)",
+            )
+        }
         (None, None) => push(
             &mut findings,
             "claude",
@@ -2561,6 +2579,24 @@ mod tests {
             .expect("yolo.parse row for garbage file");
         assert_eq!(pf.status, Status::Warn, "{:?}", pf.detail);
         assert!(pf.path.ends_with("settings.json"), "{}", pf.path);
+        // codex F4：坏文件下 yolo 行不再假报 missing 加 block。
+        let yb = b
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo")
+            .expect("yolo row for bad file");
+        assert_eq!(yb.status, Status::Warn, "{:?}", yb.detail);
+        assert!(yb.detail.contains("unparseable"), "{:?}", yb.detail);
+        // codex F3：UTF-16（读得出错非 NotFound）也判 Bad 不假报 missing。
+        let utf16: Vec<u8> = "{".encode_utf16().flat_map(|w| w.to_le_bytes()).collect();
+        fs::write(bad.join(".claude").join("settings.json"), utf16).unwrap();
+        std::env::set_var("HST_USER_HOME", &bad);
+        let u16d = diagnose(&root).expect("diagnose utf16");
+        std::env::remove_var("HST_USER_HOME");
+        assert!(
+            u16d.findings.iter().any(|f| f.check == "yolo.parse"),
+            "utf16 file must surface yolo.parse, not silent missing"
+        );
         for h in [user, root, bad] {
             let _ = fs::remove_dir_all(h);
         }

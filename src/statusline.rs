@@ -1230,7 +1230,9 @@ pub fn merge_claude(home: &Path) -> Result<String, String> {
     let mut v: serde_json::Value = if settings.exists() {
         let text = std::fs::read_to_string(&settings)
             .map_err(|e| format!("{}: {e}", settings.display()))?;
-        serde_json::from_str(&text).map_err(|e| format!("{}: corrupt: {e}", settings.display()))?
+        // D52（codex F1）：BOM 容忍（与 yolo::read_json 同类，舰队 PS 脚本）。
+        serde_json::from_str(text.trim_start_matches('\u{feff}'))
+            .map_err(|e| format!("{}: corrupt: {e}", settings.display()))?
     } else {
         json!({})
     };

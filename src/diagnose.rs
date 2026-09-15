@@ -107,16 +107,20 @@ pub fn claude_env() -> serde_json::Map<String, Value> {
 pub fn codex_gateway() -> Option<(String, String)> {
     let home = dirs::home_dir()?;
     let text = std::fs::read_to_string(home.join(".codex").join("config.toml")).ok()?;
-    let cfg: toml::Value = toml::from_str(&text).ok()?;
+    // D52（codex F1）：BOM 容忍（同 json 读侧）。
+    let cfg: toml::Value = toml::from_str(text.trim_start_matches('\u{feff}')).ok()?;
     let provider = cfg.get("model_provider")?.as_str()?;
     let base = cfg
         .get("model_providers")?
         .get(provider)?
         .get("base_url")?
         .as_str()?;
-    let auth: Value =
-        serde_json::from_str(&std::fs::read_to_string(home.join(".codex").join("auth.json")).ok()?)
-            .ok()?;
+    let auth: Value = serde_json::from_str(
+        std::fs::read_to_string(home.join(".codex").join("auth.json"))
+            .ok()?
+            .trim_start_matches('\u{feff}'),
+    )
+    .ok()?;
     let key = auth.get("OPENAI_API_KEY")?.as_str()?;
     if base.is_empty() || key.is_empty() {
         return None;
@@ -136,7 +140,7 @@ pub fn codex_view() -> (Option<String>, Option<String>) {
     let Ok(text) = std::fs::read_to_string(home.join(".codex").join("config.toml")) else {
         return (None, None);
     };
-    let Ok(cfg) = toml::from_str::<toml::Value>(&text) else {
+    let Ok(cfg) = toml::from_str::<toml::Value>(text.trim_start_matches('\u{feff}')) else {
         return (None, None);
     };
     let model = cfg
