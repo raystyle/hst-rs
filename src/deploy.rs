@@ -1579,12 +1579,82 @@ pub fn deploy_all_with(
     deploy_skills(&root, &mut report)?;
     deploy_kimi_project(&root, &mut report)?;
     deploy_instructions(&root, &mut report)?;
+    // D53：状态栏面并入全套部署（与 `hst statusline` 同路径）：脚本重生
+    //（自备脚本 marker 保护跳过）加四家 statusLine 幂等合并。fleet 实弹：
+    // init 从不触碰状态栏导致在位脚本停旧版（D51 clock 段永不到位）。
+    // 注意 statusline 函数族的 home 形参是 **hst 根**（oma，脚本落
+    // `<根>/statusline/`），不是用户家目录；merge_* 内部自取 user_home。
+    // 内容判等幂等：脚本与配置无变化时零写入零输出，init 重跑安静。
+    crate::statusline::deploy_script(oma)?;
+    crate::statusline::merge_claude(oma)?;
+    crate::statusline::merge_codex(oma)?;
+    crate::statusline::merge_kimi(oma)?;
+    crate::statusline::merge_grok(oma)?;
     Ok(report)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn init_refreshes_stale_statusline_and_respects_custom_marker() {
+        // D53（fleet 实弹）：init 全套并入状态栏面——在位旧版脚本被刷新
+        //（D51 clock 段到位）、四家 statusLine 配置幂等合并；自备脚本
+        // marker 保护不动；重跑内容判等零写入。
+        let _g = crate::pathutil::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let base = std::env::temp_dir().join(format!("hst-d53-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let user = base.join("user");
+        let root = base.join("proj");
+        let oma = base.join("hst");
+        fs::create_dir_all(user.join(".claude")).unwrap();
+        fs::create_dir_all(&root).unwrap();
+        // 在位旧版脚本（无 marker）。
+        fs::create_dir_all(oma.join("statusline")).unwrap();
+        let script = oma.join("statusline").join("hst-statusline.ps1");
+        fs::write(&script, "# old 09-13 era script, no clock segment\n").unwrap();
+        std::env::set_var("HST_USER_HOME", &user);
+        std::env::set_var("HST_ROOT", &oma);
+        deploy_all_with(&root, &user, &oma, host_side()).unwrap();
+        let body = fs::read_to_string(&script).unwrap();
+        assert!(
+            body.contains("clock"),
+            "stale script must be refreshed with the clock segment"
+        );
+        let settings: Json = serde_json::from_str(
+            &fs::read_to_string(user.join(".claude").join("settings.json")).unwrap(),
+        )
+        .unwrap();
+        assert!(settings.get("statusLine").is_some(), "bar config merged");
+        // 幂等：再跑脚本内容与 mtime 不动。
+        let meta_before = fs::metadata(&script).unwrap().modified().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        deploy_all_with(&root, &user, &oma, host_side()).unwrap();
+        assert_eq!(
+            fs::metadata(&script).unwrap().modified().unwrap(),
+            meta_before,
+            "content-equal rerun must not touch mtime"
+        );
+        // 自备脚本 marker：init 不覆盖用户定制。
+        fs::write(&script, "# user custom bar\n").unwrap();
+        fs::write(
+            oma.join("statusline").join("hst-statusline.ps1.custom"),
+            "/somewhere/custom.ps1",
+        )
+        .unwrap();
+        deploy_all_with(&root, &user, &oma, host_side()).unwrap();
+        assert_eq!(
+            fs::read_to_string(&script).unwrap(),
+            "# user custom bar\n",
+            "custom script marker must protect user content"
+        );
+        std::env::remove_var("HST_USER_HOME");
+        std::env::remove_var("HST_ROOT");
+        let _ = fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn home_root_skips_project_retirement_and_keeps_user_keys() {

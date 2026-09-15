@@ -1185,10 +1185,16 @@ pub fn deploy_script(home: &Path) -> Result<PathBuf, String> {
                 e
             }
         })?;
-        std::fs::write(&p, script).map_err(|e| format!("{}: {e}", p.display()))?;
+        // D53：内容判等幂等（init 全套并入后重跑不搅 mtime；同 write_skill
+        // 语义，只在内容变化时落盘）。
+        if std::fs::read_to_string(&p).ok().as_deref() != Some(script.as_str()) {
+            std::fs::write(&p, script).map_err(|e| format!("{}: {e}", p.display()))?;
+        }
     }
     let cmd = grok_cmd_path(home);
-    std::fs::write(&cmd, STATUSLINE_GROK_CMD).map_err(|e| format!("{}: {e}", cmd.display()))?;
+    if std::fs::read_to_string(&cmd).ok().as_deref() != Some(STATUSLINE_GROK_CMD) {
+        std::fs::write(&cmd, STATUSLINE_GROK_CMD).map_err(|e| format!("{}: {e}", cmd.display()))?;
+    }
     Ok(p)
 }
 
