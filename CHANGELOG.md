@@ -108,6 +108,10 @@
 
 - **Windows 构建切 gnu 交叉编译 v1.1.5**（D47，用户裁摆脱 VC，stable 切 gnu 封版）：CI 的 windows-latest msvc 岗换 ubuntu-latest 交叉岗（apt mingw-w64 条件步、Test 交叉岗跳过由 linux/mac 双岗覆盖、Package 后缀改判 triple），Windows 资产名改 `hst-<arch>-pc-windows-gnu.zip`（CRT 静态零 DLL 依赖，12.1MB 与 msvc 同量级，ohmycloud 裸环境交叉与 lan-win 实弹双实证）；`hst self update` 关键词梯子 `windows-gnu > windows-msvc > windows`（新源选 gnu、旧 release msvc-only 回落、通用词保底旧 msvc 二进制升级）；codex 复核四发现全收（S028 D47 追记、INDEX 标签、cfg 断言 CI 盲区记 TODO、README gnu 翻名随本封版落地）；herdr 共存实证同日落档（S035，状态栏 unknown 非冲突定性）。
 
+### 里程碑 2026-09-15
+
+- **断源自救与诊断正名 v1.2.0**（D48 至 D51 攒批，用户裁「要新封版」）：**D48 stable 镜像腿与限流自救**（ohmycloud 舰队撞 api.github.com 匿名 403 断源转需求）：`HST_MIRROR` 未设改 GitHub 优先、失败自动回退镜像腿默认基址（ark 三层读序参照，段随通道、dev 禁落 stable）、设值扩到 stable 通道 mirror-first、`GH_TOKEN` 在位附 Bearer（匿名 60 升 5000 次每时）；真网 e2e 两轮（mirror-first stable 腿下载替换与幂等 already-latest）；顺带根修 stable 通道镜像整段跳过的老缺口。**D49 技能名翻 hst**（两轮：先兼容窗、后用户令旧牌直接删除）：技能唯一名 `hst`，旧牌 `ohmyagents` 目录由 `skill --write`（`skill.retired=`）与 `init` 四处（`(retired)`）幂等退役，ours 识别（marker 家族或生成签名）用户手改不动，外科式只删 SKILL.md 目录空才收。**D50 doctor bypass 残余阻塞面**（S029 追记分类学落地）：新检查 `yolo.ask`（ask 规则 bypass 下照弹，三层）与 `yolo.readblock`（读沙箱键，不可静态分析命令即使 bypass 也问人，三层），既有 yolo 检查补 `settings.local.json` 层并修项目层 bypass-only 假阳性（claude 2.1.257 起项目层被忽略）。**D51 状态栏 clock 段**：第一行行尾年月日加当前时间（`yyyy-MM-dd HH:mm` 分钟精度，渲染事件重绘即活钟；`{datetime}` 占位与 `clock` 图标键可定制，冒号转义钉 ASCII 免区域文化替换）。S029 追记 bypass 残余阻塞分类学（官方七页文档加 changelog 取证，证伪 resume 还原旧记）与 S035 herdr 共存实证同窗落档。
+
 ### 排后
 
 - Linux/mac 接管（P0012 跨平台面）：资产与代码路径就绪；指令集 SIGILL 预备检测研究已备（S021）。
