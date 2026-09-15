@@ -1559,9 +1559,22 @@ pub fn deploy_all_with(
     fs::create_dir_all(&root).map_err(|e| format!("{}: {e}", root.display()))?;
     let mut report = DeployReport::default();
     deploy_user_hooks_with(user_home, oma, side, &mut report)?;
-    retire_project_hooks_with(&root, &mut report)?;
-    for c in crate::yolo::retire_project_yolo(&root)? {
-        report.wrote.push(c);
+    // D52 铁证修复：root == 用户家目录时，项目级退役趟（D28 面向「项目内
+    // 旧 ours 注册与项目 yolo 键」）会打到用户级文件本体——把本批用户级
+    // 刚落的 yolo 键当项目键整批摘掉（宿主裸 init 于 C:\Users\ray 实弹：
+    // settings.json 与 codex 与 kimi 三文件同批 (retired-yolo) 洗键）。
+    // 家目录不是项目：退役趟整组跳过并打点。
+    if same_location(&root, user_home) {
+        report.warns.push(
+            "project-level retirement skipped: project root is the user home \
+             (home is not a project; user-level keys stay)"
+                .to_string(),
+        );
+    } else {
+        retire_project_hooks_with(&root, &mut report)?;
+        for c in crate::yolo::retire_project_yolo(&root)? {
+            report.wrote.push(c);
+        }
     }
     deploy_skills(&root, &mut report)?;
     deploy_kimi_project(&root, &mut report)?;
@@ -1569,9 +1582,61 @@ pub fn deploy_all_with(
     Ok(report)
 }
 
+/// 两路径是否同一位置：canonicalize 双侧（符号链接归一，macOS /var 与
+/// /private/var 类），失败退 abs 字符串等值。
+fn same_location(a: &Path, b: &Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        _ => crate::pathutil::abs_display(a) == crate::pathutil::abs_display(b),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn home_root_skips_project_retirement_and_keeps_user_keys() {
+        // D52 铁证回归：宿主裸 init 于家目录（cwd = C:\Users\ray），项目级
+        // 退役趟把用户级刚落的 yolo 键当项目键摘掉（settings 与 codex 与
+        // kimi 三文件同批 (retired-yolo) 洗键）。家目录不是项目：退役趟
+        // 跳过、键全保、打 warn。
+        let home = std::env::temp_dir().join(format!("hst-home-root-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&home);
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        fs::write(
+            home.join(".claude").join("settings.json"),
+            r#"{"permissions": {"defaultMode": "bypassPermissions", "blockReadsOutsideWorkingDirectories": false, "skipDangerousModePermissionPrompt": true}}"#,
+        )
+        .unwrap();
+        let report = deploy_all_with(&home, &home, &home.join(".hst"), host_side()).unwrap();
+        let v: Json = serde_json::from_str(
+            &fs::read_to_string(home.join(".claude").join("settings.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            v["permissions"]["defaultMode"], "bypassPermissions",
+            "user keys must survive when project root is the home"
+        );
+        assert_eq!(
+            v["permissions"]["blockReadsOutsideWorkingDirectories"], false,
+            "D52 readblock key must survive"
+        );
+        assert!(
+            report
+                .warns
+                .iter()
+                .any(|w| w.contains("project-level retirement skipped")),
+            "skip must be loud: {:?}",
+            report.warns
+        );
+        assert!(
+            !report.wrote.iter().any(|w| w.contains("retired-yolo")),
+            "no project retirement against user files: {:?}",
+            report.wrote
+        );
+        let _ = fs::remove_dir_all(&home);
+    }
 
     #[test]
     fn is_ours_handles_windows_call_operator_form() {

@@ -68,7 +68,7 @@
 ### 宿主实弹案例与 D52 修复
 
 - [实证： ohmycloud 2026-09-15 lan-win] yolo.readblock warn 在真机定位到实案（读块键导致的残余阻塞被 doctor 直接点名，正面价值已验）。
-- 宿主「init 洗键」两报归因演进（三次修正，教训在案）：第 1 报疑 init 覆盖，我方复现证伪（无 BOM 合并正确、BOM 下响亮报错零改写）；第 2 报（干净无 BOM 文件仍洗成 permissions={skip:true} 单键）先误归因为 BOM 假报，反例证伪后以**逐字节指纹**定位：受损形态 = `hst init --yolo=off` 在宿主原样文件上的精确产出（retire 摘 defaultMode 加 D52 落的 blockReads==false、不动 permissions 内异位 skip、codex 面只摘不写，三症状同源）[实证： 本机沙箱复现逐键一致]；off 分支不打印 init.scope=full，与宿主引文矛盾，推定包装脚本串联 off 清理趟，待宿主命令行取证结案。D52 修复面（读侧 BOM 容忍 + yolo full 落 blockReads=false + doctor yolo.parse）不受影响照常成立。
+- 宿主「init 洗键」归因演进（三次修正后铁证定案，教训在案）：第 1 报疑 init 覆盖，复现证伪（无 BOM 合并正确、BOM 下响亮报错零改写）；第 2 报（干净文件仍洗成 permissions={skip:true} 单键）先误归因 BOM 假报，反例证伪；再以逐字节指纹疑 `--yolo=off`，宿主全量 marker 复现又证伪（flag.yolo=false 加 level=full，非 off 分支）。**终版真凶（宿主 marker 铁证加我方确定性复现）**：裸 init 于**家目录为 cwd**（root == 用户家目录）时，deploy_all 的项目级退役趟（retire_project_hooks_with 加 retire_project_yolo，D28 面向项目内旧注册）把用户级文件当项目文件，将 cmd_init 第 1 步刚落的用户级 yolo 键整批摘掉：宿主 marker 的 `(retired-ours)` 与三文件 `(retired-yolo)` 行即该趟足迹，三症状（claude 洗键、codex 键未落实为同趟摘除、kimi 同）一因同源 [实证： Linux 沙箱 root==home 确定性复现逐字节一致]。修复 = deploy_all 家目录守卫（same_location 判 root==user_home 时退役趟整组跳过，打 init.hooks.warn 点名）。D52 其余修复面（读侧 BOM 容忍 + yolo full 落 blockReads=false + doctor yolo.parse）不受影响照常成立。
 
 ### hst 落点评估与待办
 
