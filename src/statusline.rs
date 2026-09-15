@@ -138,7 +138,7 @@ if ($dir) {
 /// `clock` 图标键可定制。
 const SEG_CLOCK: &str = r#"
 # ── clock 段：年月日 + 当前时间（D51；Get-Date 零子进程）──
-$dt = (Get-Date -Format 'yyyy-MM-dd HH:mm')
+$dt = (Get-Date -Format 'yyyy-MM-dd HH\:mm')
 if ($dt) {
     $ck = Seg (ApplyFmt (Tmpl 'clock') @{ icon = (Ico 'clock'); datetime = $dt }) '38;5;245'
     if ($ck) { $parts.Add($ck) }
@@ -1349,7 +1349,7 @@ pub const EXAMPLE_TOML: &str = r#"# ~/.hst/statusline.toml —— 状态栏用�
 #   segments3 = []
 # 退单行（kimi / grok 运行时自动并一行；显式退单行用）：
 #   single_line = true
-segments = ["shell", "dir", "git", "package", "python", "rust", "node", "zig", "go", "cpp"]
+segments = ["shell", "dir", "git", "package", "python", "rust", "node", "zig", "go", "cpp", "clock"]
 segments2 = ["hst", "model", "context", "duration"]
 segments3 = []
 
@@ -1361,6 +1361,7 @@ segments3 = []
 #   tools {icon}{count} / mcp {icon}{count} / tokens {icon}{used}{window}
 #   duration {icon}{duration} / git {branch}{flags}
 #   package 与七工具链段（含 ts）{icon}{version}
+#   clock {icon}{datetime}（D51：年月日加当前时间，分钟精度）
 # 例（hst 段去图标改方括号态）：
 # [template]
 # hst = "{agent}[{state}]"
@@ -1368,6 +1369,7 @@ segments3 = []
 # 图标映射（[icons]）：键级回落；hst 机器人宽字形默认跟两空格。
 # 可用键：shell / shell-pwsh / hst / model / context / tools / mcp / tokens
 #         / duration / package / python / rust / node / ts / zig / go / cpp
+#         / clock（D51 加）
 # 例：
 # [icons]
 # rust = "R "
@@ -1519,7 +1521,7 @@ mod tests {
         assert_eq!(DEFAULT_SEGMENTS.last(), Some(&"clock"));
         let ps1 = default_statusline_ps1();
         assert!(
-            ps1.contains("Get-Date -Format 'yyyy-MM-dd HH:mm'"),
+            ps1.contains(r"Get-Date -Format 'yyyy-MM-dd HH\:mm'"),
             "clock uses local Get-Date with minute precision"
         );
         assert!(ps1.contains("{icon}{datetime}"), "clock template default");

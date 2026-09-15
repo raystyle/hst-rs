@@ -763,7 +763,10 @@ fn statusline_example_prints_customization_template() {
         .stdout(contains("segments3 = "))
         .stdout(contains("single_line"))
         .stdout(contains("tools / mcp / tokens"))
-        .stdout(contains("rust / node / ts / zig / go / cpp"));
+        .stdout(contains("rust / node / ts / zig / go / cpp"))
+        // D51：--example 随默认段同步（codex F1：漂移会误导照抄丢时钟段）。
+        .stdout(contains("\"clock\"]"))
+        .stdout(contains("clock {icon}{datetime}"));
 }
 
 #[test]
