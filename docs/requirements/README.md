@@ -1,0 +1,11 @@
+# Requirements 索引
+
+> 需求登记:新需求先立 REQ 再实现,实现后回填 trace(测试或验收命令)。新建拷 0000-template.md,编号接当前最大号。状态 draft 到 implemented 到 rejected。历史需求清单在根 `PRD.md`（D 编号，2026-09-15 前入口，迁移注记见其顶部）。
+
+| id | 状态 | 优先级 | 标题 | trace |
+|---|---|---|---|---|
+| REQ-001 | implemented | must | 文档体系迁移dev-evo | check.py 全项 |
+| REQ-002 | draft | should | 资产名与关键词取参纯函数重构 | |
+| REQ-003 | draft | should | self-update读序不回环集成断言 | |
+| REQ-004 | draft | should | grok运行时退单排pwsh闸门断言 | |
+| REQ-005 | draft | should | 门禁脚本退出码对齐CI | |
