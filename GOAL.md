@@ -18,7 +18,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：D50 doctor yolo 诊断面补 bypass 残余阻塞信号：两项新 warn 检查（yolo.ask 与 yolo.readblock，三层全查）加一项既有 yolo 检查语义修正（项目层补 local 层读取、项目层 bypass 按 2.1.257 忽略语义处理：bypass-only 判 warn、不构成对用户层的遮蔽）；测试门禁全绿、codex 评审对齐后推 main。
+- **锚定的目标**：无（D50 已交付，2026-09-15 当日闭环：评审对齐推 main CI 绿、dogfood 零假阳性；队列遗项 D47/D48 F3 测试钉与 G2 grok 闸门）。
 
 ### 推进时间线
 
@@ -26,6 +26,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 | 日期 | 进展 |
 | --- | --- |
+| 2026-09-15 | **D50 交付**：两项新 warn 检查（yolo.ask 三层、yolo.readblock 三层）加既有 yolo 检查修正（local 层读取、2.1.257 忽略语义：bypass-only warn 且不构成遮蔽）；codex F1 至 F4 全收后推 main（5f9420c 加 fe0c94c）CI 绿，180 单测加 28 集成绿；dogfood 零假阳性 |
 | 2026-09-15 | **D50 立项开工**：S029 追记候选转正（用户令「开工」）：doctor yolo 面补三项 warn（项目层遮蔽、ask 规则、读块键）加既有检查两缺口随批修（local 层读取、项目层 bypass-only 假阳性）；评审闸门用户令随批（w2:p2） |
 | 2026-09-14 | **D49 第 2 轮交付（旧牌直接删除）**：用户令取消兼容窗；单名 hst 加幂等退役（用户级生成签名识别打 skill.retired、项目级四处 marker 家族打 (retired)，外科式只删 SKILL.md 目录空才收）；codex F1 至 F4 全收后推 main（ed70707 加 3b97b28）CI 绿；dogfood 退役实弹；舰队回执四端落位加 lan-mac 504 反例素材，修订知会已发 |
 | 2026-09-14 | **D49 交付**：codex F1 至 F3 全收后推 main（1ad0685 加 74b8e1c）CI 绿；用户级与项目级双技能落位实弹、本会话技能列表双技能刷新可见；1.2.0 摘兼容双写入 TODO 队列 |

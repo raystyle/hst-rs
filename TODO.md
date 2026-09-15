@@ -8,9 +8,9 @@ D50 doctor yolo 诊断面补 bypass 残余阻塞信号（2026-09-15 立项，S02
 
 - [x] 既有 yolo 检查语义修正（项目层补 settings.local.json 读取；项目层 bypass 按 2.1.257 忽略语义：bypass-only 判 warn、不构成对用户层遮蔽即不进 conflict 臂，codex F3）
 - [x] 两项新 warn 检查（yolo.ask 三层全查含用户层 codex F4、yolo.readblock 三层；遮蔽信号并入既有 conflict warn 不另立名）
-- [ ] 测试（三类正负例加 bypass-only 假阳性修正回归）
-- [ ] 文档（R002 doctor 行、S029 追记回指、INDEX doctor.rs 行）
-- [ ] 门禁与 dogfood、codex 评审对齐（w2:p2）后推 main
+- [x] 测试（local 层遮蔽、bypass-only 假阳性、双 bypass 回退用户层 ok、p=bypass 加 u=acceptEdits 不误报（F3）、ask 与 readblock 正负例；180 单测加 28 集成绿）
+- [x] 文档（R002 doctor 行含三层口径与不遮蔽语义、S029 追记挂 D50 交付回指、INDEX doctor.rs 行）
+- [x] 门禁与 dogfood 零假阳性、codex 评审 F1 至 F4 全收（5f9420c 加 fe0c94c）推 main CI 绿
 
 D49 技能名翻 hst 旧牌直接删除（2026-09-14 立项；第 2 轮用户裁定取消兼容窗）：
 
