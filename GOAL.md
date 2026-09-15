@@ -18,7 +18,7 @@ D48 前起点（2026-09-14，ohmycloud 知会转需求（澄清一轮已裁）�
 
 > 当前锚定的目标 + 推进时间线。
 
-- **锚定的目标**：D50 doctor yolo 诊断面补 bypass 残余阻塞信号：三项新 warn 检查（yolo.mask 项目层遮蔽含 local 层、yolo.ask 项目层 ask 规则、yolo.readblock 读沙箱键）加 yolo 检查语义随 S029 修正（项目层 bypass-only 不再 ok）；测试门禁全绿、codex 评审对齐后推 main。
+- **锚定的目标**：D50 doctor yolo 诊断面补 bypass 残余阻塞信号：两项新 warn 检查（yolo.ask 与 yolo.readblock，三层全查）加一项既有 yolo 检查语义修正（项目层补 local 层读取、项目层 bypass 按 2.1.257 忽略语义处理：bypass-only 判 warn、不构成对用户层的遮蔽）；测试门禁全绿、codex 评审对齐后推 main。
 
 ### 推进时间线
 

@@ -875,9 +875,24 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
     // D33：yolo 判据分级接受（full=bypassPermissions、partial=acceptEdits）。
     let claude_yolo_ok = |m: &str| matches!(m, "bypassPermissions" | "acceptEdits");
     match (&claude_proj_mode, &claude_user_mode) {
-        // 双级冲突（D28 第 4 令；D50 补 local 层）：项目遮蔽用户即静默降级
-        //（S029 追记：项目层 defaultMode 优先级高于用户层，bypass 名义下
-        // 全线提示回潮），warn 加对齐 CTA。
+        // 项目层 bypass（2.1.257 起被忽略，不生效）：实际生效层是用户层，
+        // 按用户层判；不构成遮蔽（codex F3：p=bypass 加 u=acceptEdits 实际
+        // 生效 acceptEdits，D33 下 ok，走 conflict 臂属误报）。
+        (Some((p, _)), Some(u)) if p == "bypassPermissions" => push(
+            &mut findings,
+            "claude",
+            "yolo",
+            claude_yolo_ok(u),
+            &claude_user_yolo,
+            format!(
+                "defaultMode={u} (user level; project bypassPermissions copy \
+                 ignored since claude 2.1.257)"
+            ),
+        ),
+        // 双级冲突（D28 第 4 令；D50 补 local 层）：非忽略的项目 mode
+        //（acceptEdits / default / auto 等）遮蔽用户层即静默降级（S029 追
+        // 记：项目层优先级高于用户层，bypass 名义下全线提示回潮），warn
+        // 加对齐 CTA。
         (Some((p, ppath)), Some(u)) if p != u => push_status(
             &mut findings,
             "claude",
@@ -889,16 +904,6 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
                  downgrade, S029); align via `hst init --project-yolo=<level>` \
                  or drop one level (D28 r4)"
             ),
-        ),
-        // 项目层与用户层同为 bypass：2.1.257 起项目层被忽略，实际生效层是
-        // 用户层（同为 bypass 即仍 ok，报告用户层面）。
-        (Some((p, _)), Some(u)) if p == "bypassPermissions" && u == "bypassPermissions" => push(
-            &mut findings,
-            "claude",
-            "yolo",
-            true,
-            &claude_user_yolo,
-            "defaultMode=bypassPermissions (user level; project copy ignored since claude 2.1.257)",
         ),
         (Some((p, ppath)), Some(_)) => push(
             &mut findings,
@@ -958,6 +963,9 @@ pub fn diagnose(root: &Path) -> Result<Diagnosis, String> {
     for (path, layer) in [
         (&claude_local_settings, "project-local"),
         (&claude_shared, "project"),
+        // codex F4：用户级 ask 同样 bypass 下照弹，口径与 readblock 对齐
+        //（三层全查）。
+        (&claude_user_yolo, "user"),
     ] {
         let n = ask_count(path);
         if n > 0 {
@@ -2416,6 +2424,15 @@ mod tests {
         let bypass_proj = r#"{"permissions": {"defaultMode": "bypassPermissions"}}"#;
         fs::write(root.join(".claude").join("settings.json"), bypass_proj).unwrap();
         fs::write(both.join(".claude").join("settings.json"), bypass_proj).unwrap();
+        // u=acceptEdits 加 p=bypass：项目层被忽略不构成遮蔽，实际生效
+        // acceptEdits（D33 ok），不得走 conflict 误报（codex F3）。
+        let partial_user = temp_root("pbo-partial");
+        fs::create_dir_all(partial_user.join(".claude")).unwrap();
+        fs::write(
+            partial_user.join(".claude").join("settings.json"),
+            r#"{"permissions": {"defaultMode": "acceptEdits"}}"#,
+        )
+        .unwrap();
         std::env::set_var("HST_USER_HOME", &user);
         let d = diagnose(&root).expect("diagnose");
         let f = d
@@ -2423,6 +2440,11 @@ mod tests {
             .iter()
             .find(|f| f.agent == "claude" && f.check == "yolo")
             .expect("yolo row");
+        std::env::set_var("HST_USER_HOME", &partial_user);
+        let f_partial = diagnose(&root).expect("diagnose partial-user");
+        std::env::set_var("HST_USER_HOME", &user);
+        crate::yolo::apply_user_yolo_with(&user).unwrap();
+        let f_both = diagnose(&both).expect("diagnose both");
         std::env::remove_var("HST_USER_HOME");
         assert_eq!(f.status, Status::Warn, "{:?}", f.detail);
         assert!(
@@ -2430,9 +2452,28 @@ mod tests {
             "{:?}",
             f.detail
         );
+        let fp = f_partial
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo")
+            .expect("yolo row (partial user)");
+        assert_eq!(fp.status, Status::Ok, "{:?}", fp.detail);
+        assert!(fp.detail.contains("user level"), "{:?}", fp.detail);
+        let fb = f_both
+            .findings
+            .iter()
+            .find(|f| f.agent == "claude" && f.check == "yolo")
+            .expect("yolo row (both bypass)");
+        assert_eq!(fb.status, Status::Ok, "{:?}", fb.detail);
+        assert!(
+            fb.detail.contains("project bypassPermissions copy ignored"),
+            "{:?}",
+            fb.detail
+        );
         let _ = fs::remove_dir_all(&user);
         let _ = fs::remove_dir_all(&root);
         let _ = fs::remove_dir_all(&both);
+        let _ = fs::remove_dir_all(&partial_user);
     }
 
     #[test]
