@@ -72,4 +72,5 @@ D16，2026-09-08。
 - GH_TOKEN 更正：本文件前文「GH_TOKEN 自动附带」与现码不符：D48 前的 fetch_release 只发 UA 与 Accept；D48 起在位附 `Authorization: Bearer`（ark resolve.rs 同款，匿名 60 升 5000 次每时）[实证]。
 - 读序三态（D48，ark 先例）：`HST_MIRROR` 设值 = 基址覆盖加 mirror-first 两通道（失败回落 GitHub）；未设 = GitHub 优先、失败自动回退镜像腿用默认基址 `env.ohmygh.com`（不占缺省行为面）；空串 = 镜像全关。kv 标记 `update.mirror` 三值形 = 基址原值、`fallback-default:<基址>`、`off`。
 - stable 镜像腿 = dev 机制参数化复用（via_mirror 抽段参）：deterministic 名取 `<基址>/hst/stable/<资产>.sha256` 边车、digest 对 `selfupdate.json` 记录判新（hst 是 zip 资产，digest 是压缩包哈希与 exe 哈希不可比，故不照抄 ark 的裸 exe 直比）、sha256 强校验、Windows rename 舞步复用；段随通道、dev 禁落 stable（防正式版装进滚动源）。
-- e2e 两轮 [实证]：R1 mirror-first stable 腿真网下载 v1.1.5 linux 资产、校验替换、记录 tag `stable-mirror`；R2 边车 digest 与记录一致出 `update.ok=already-latest`。R1 替换的是运行中 debug 二进制，顺带实证旧 v1.1.5 二进制的旧行为（mirror 设值加 stable 仍 skipped），即舰队断腿的机器侧复现。
+- e2e 两轮 [实证]：R1 mirror-first stable 腿真网下载 v1.1.5 linux 资产、校验替换、记录 tag `stable-mirror`；R2 边车 digest 与记录一致出 `update.ok=already-latest`。
+- 舰队级生产实证 [实证： ohmycloud 2026-09-15 v1.2.0 收敛回执]：四机旧位二进制升级 1.2.0 时实际走缺省回退腿（`update.mirror=fallback-default` 打点实证），GitHub 不可用场景自愈按设计生效；镜像另播 `hst/1.2.0` 版本段（catalog-seed 通道，与 hst/stable 滚动段并存）。R1 替换的是运行中 debug 二进制，顺带实证旧 v1.1.5 二进制的旧行为（mirror 设值加 stable 仍 skipped），即舰队断腿的机器侧复现。
